@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+
+    <title>LAMAYNE IPTV</title>
+
+    <link
+      rel="icon"
+      type="image/png"
+      href="/brand/lamayne-emblem.png"
+    />
+
+    <meta
+      name="application-name"
+      content="LAMAYNE IPTV"
+    />
+
+    <meta
+      name="description"
+      content="LAMAYNE IPTV — votre lecteur personnel pour Live TV, films et séries."
+    />
+
+    <meta
+      name="theme-color"
+      content="#101014"
+    />
+
+    <style>
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+        background: #101014;
+        color: #f4f4f5;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        opacity: 1;
+        transition: opacity 320ms ease;
+      }
+
+      #boot-splash.boot-hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #boot-splash img {
+        width: 112px;
+        height: 112px;
+        object-fit: contain;
+        border-radius: 24px;
+      }
+
+      #boot-splash .boot-brand {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: #a1a1aa;
+      }
+
+      #boot-splash .boot-title {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 600;
+        text-align: center;
+      }
+
+      #boot-splash .boot-status {
+        margin: 0;
+        font-size: 13px;
+        color: #71717a;
+      }
+
+      #boot-splash .boot-bar {
+        position: relative;
+        width: 180px;
+        height: 3px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      #boot-splash .boot-bar::after {
+        content: '';
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 40%;
+        border-radius: 999px;
+        background: #8b5cf6;
+        animation: boot-slide 1.2s ease-in-out infinite;
+      }
+
+      @keyframes boot-slide {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(350%);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #boot-splash {
+          transition: none;
+        }
+
+        #boot-splash .boot-bar::after {
+          animation: none;
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+
+    <div id="boot-splash" role="status" aria-live="polite">
+      <img
+        id="boot-logo"
+        src="/brand/lamayne-emblem.png"
+        alt=""
+        width="112"
+        height="112"
+      />
+
+      <p class="boot-brand">LAMAYNE IPTV</p>
+
+      <p class="boot-title" id="boot-title">
+        Bienvenue sur LAMAYNE IPTV
+      </p>
+
+      <p class="boot-status" id="boot-status">
+        Chargement en cours…
+      </p>
+
+      <div class="boot-bar"></div>
+    </div>
+
+    <script>
+      // Textes de l'écran de chargement, avant le démarrage de l'application.
+      // Mêmes langues que src/i18n : réglage enregistré, sinon langue du
+      // système, sinon anglais.
+      (function () {
+        var TEXTS = {
+          fr: ['Bienvenue sur LAMAYNE IPTV', 'Chargement en cours…'],
+          en: ['Welcome to LAMAYNE IPTV', 'Loading…'],
+          es: ['Te damos la bienvenida a LAMAYNE IPTV', 'Cargando…'],
+        };
+        var lang = 'en';
+
+        try {
+          var stored = JSON.parse(localStorage.getItem('msp_language') || 'null');
+          var candidates = navigator.languages || [navigator.language || 'en'];
+
+          if (stored && TEXTS[stored]) {
+            lang = stored;
+          } else {
+            for (var i = 0; i < candidates.length; i += 1) {
+              var base = String(candidates[i]).toLowerCase().split('-')[0];
+
+              if (TEXTS[base]) {
+                lang = base;
+                break;
+              }
+            }
+          }
+        } catch (error) {}
+
+        document.documentElement.lang = lang;
+        document.getElementById('boot-title').textContent = TEXTS[lang][0];
+        document.getElementById('boot-status').textContent = TEXTS[lang][1];
+      })();
+    </script>
+
+    <script
+      type="module"
+      src="/src/main.tsx"
+    ></script>
+  </body>
+</html>
