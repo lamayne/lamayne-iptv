@@ -1,0 +1,168 @@
+name: Release
+
+# Builds the Windows installers when a version tag is pushed:
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# 1. "build"  : two unsigned installers (standard, and "offline" for the
+#               Microsoft Store with WebView2 included).
+# 2. "sign"   : signing by SignPath (free for open source). Skipped while the
+#               SIGNPATH_ORGANIZATION_ID variable is not defined
+#               (see docs/PUBLISHING.md, step 3).
+# 3. "release": publication as a DRAFT, with checksums, to review before
+#               publishing it.
+#
+# Important for SignPath (open source projects): every job must run on
+# GitHub-hosted machines (no self-hosted runner).
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - id: meta
+        name: Check version numbers
+        shell: pwsh
+        run: |
+          $pkg = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $tauri = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1).Matches.Groups[1].Value
+          if ($pkg -ne $tauri -or $pkg -ne $cargo) {
+            throw "Versions differ: package.json=$pkg, tauri.conf.json=$tauri, Cargo.toml=$cargo"
+          }
+          if ('${{ github.ref_type }}' -eq 'tag' -and '${{ github.ref_name }}' -ne "v$pkg") {
+            throw "Tag ${{ github.ref_name }} does not match version $pkg."
+          }
+          "version=$pkg" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+      - run: pnpm test
+
+      # Downloads libmpv-2.dll and libmpv-wrapper.dll into src-tauri/lib
+      # (they are not in Git).
+      - name: Download libmpv
+        run: npx tauri-plugin-libmpv-api setup-lib
+
+      - name: Standard installer
+        run: pnpm tauri build --bundles nsis
+
+      - name: Collect the standard installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          $file = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          Copy-Item $file.FullName "dist/LAMAYNE-IPTV_${{ steps.meta.outputs.version }}_x64-setup.exe"
+
+      # Microsoft Store version: WebView2 is included (bigger installer).
+      - name: Offline installer (Microsoft Store)
+        run: pnpm tauri build --bundles nsis --config src-tauri/tauri.microsoftstore.conf.json
+
+      - name: Collect the offline installer
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
+          Copy-Item $file.FullName "dist/LAMAYNE-IPTV_${{ steps.meta.outputs.version }}_x64-setup-offline.exe"
+
+      - id: upload
+        name: Upload the unsigned installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installers
+          path: dist/*.exe
+          if-no-files-found: error
+
+  sign:
+    needs: build
+    # Only runs if SignPath is configured (repository variable).
+    if: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Request signing from SignPath
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: lamayne-iptv
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ needs.build.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-installers
+          path: signed/*.exe
+          if-no-files-found: error
+
+  release:
+    needs: [build, sign]
+    # Keeps going even if signing is skipped (SignPath not configured).
+    if: ${{ always() && needs.build.result == 'success' && (needs.sign.result == 'success' || needs.sign.result == 'skipped') && github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Get the signed installers
+        if: ${{ needs.sign.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-installers
+          path: release
+
+      - name: Get the installers (unsigned)
+        if: ${{ needs.sign.result != 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: unsigned-installers
+          path: release
+
+      - name: Checksums
+        run: |
+          cd release
+          sha256sum *.exe > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create the release (draft)
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: LAMAYNE IPTV ${{ github.ref_name }}
+          body: |
+            ${{ needs.sign.result == 'success' && '✅ Signed installers (SignPath Foundation certificate).' || '⚠️ UNSIGNED installers: Windows may show a SmartScreen warning.' }}
+
+            - `LAMAYNE-IPTV_${{ needs.build.outputs.version }}_x64-setup.exe`: standard installer (recommended).
+            - `LAMAYNE-IPTV_${{ needs.build.outputs.version }}_x64-setup-offline.exe`: offline installer (WebView2 included, used for the Microsoft Store).
+
+            See CHANGELOG.md for the list of changes. LAMAYNE IPTV provides no content.
+          files: |
+            release/*.exe
+            release/SHA256SUMS.txt
