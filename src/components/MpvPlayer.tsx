@@ -86,7 +86,6 @@ type Props = {
   onEnded?: () => void;
   onProgress?: (position: number, duration: number) => void;
     title?: string;
-      subtitle?: string;
 };
 
 
@@ -280,7 +279,6 @@ export default function MpvPlayer({
   onEnded,
   onProgress,
   title,
-    subtitle,
 }: Props) {
   const { activeProfile, defaultVolume, t } = useApp();
 
