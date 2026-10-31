@@ -1,0 +1,4 @@
+# Signing rules and workflows can only be changed by the project owner
+# (SignPath recommendation).
+/.signpath/ @lamayne
+/.github/workflows/ @lamayne
