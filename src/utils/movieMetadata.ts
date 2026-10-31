@@ -263,7 +263,7 @@ function prune() {
 function persist() {
   prune();
 
-  let values = [...entries.values()].sort(
+  const values = [...entries.values()].sort(
     (a, b) => b.fetchedAt - a.fetchedAt
   );
 
@@ -426,6 +426,8 @@ export function useMovieMetadataIndex(
     }
 
     return result;
+    // `version` change à chaque mise à jour du cache : il force la relecture.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceKey, version]);
 }
 
