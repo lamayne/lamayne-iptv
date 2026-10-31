@@ -167,8 +167,4 @@ jobs:
 
       - name: Summary
         run: |
-          if [ "${{ needs.sign.result }}" = "success" ]; then
-            echo "Signed installers (SignPath Foundation certificate) were attached to the release." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "UNSIGNED installers were attached to the release: mention it in the release notes (Windows may show a SmartScreen warning)." >> "$GITHUB_STEP_SUMMARY"
-          fi
+          if [ "${{ needs.sign.result }}"
