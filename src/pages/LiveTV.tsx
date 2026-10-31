@@ -131,7 +131,6 @@ export default function LiveTV() {
     baseChannels,
     effectiveCategory,
     query,
-    isRecent,
   ]);
 
   const filterKey = JSON.stringify([
