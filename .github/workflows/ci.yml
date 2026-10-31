@@ -39,11 +39,8 @@ jobs:
       - name: Automated tests
         run: pnpm test
 
-      # ESLint does not block yet: it will be enforced once the existing
-      # warnings are fixed.
       - name: Code style
         run: pnpm lint
-        continue-on-error: true
 
       # The libmpv DLLs are needed to compile (Tauri resources).
       - name: Download libmpv
