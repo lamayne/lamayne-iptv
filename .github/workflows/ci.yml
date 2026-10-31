@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the "packageManager" field of package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: TypeScript types
+        run: pnpm typecheck
+
+      - name: Translations (same phrases in every language)
+        run: pnpm check:i18n
+
+      - name: Automated tests
+        run: pnpm test
+
+      # ESLint does not block yet: it will be enforced once the existing
+      # warnings are fixed.
+      - name: Code style
+        run: pnpm lint
+        continue-on-error: true
+
+      # The libmpv DLLs are needed to compile (Tauri resources).
+      - name: Download libmpv
+        run: npx tauri-plugin-libmpv-api setup-lib
+
+      - name: Rust build check and tests
+        working-directory: src-tauri
+        run: |
+          cargo check
+          cargo test --lib
