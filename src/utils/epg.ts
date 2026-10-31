@@ -132,6 +132,8 @@ function decodeTitle(value: unknown): string {
   try {
     const bytes = Uint8Array.from(atob(original), (c) => c.charCodeAt(0));
     const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    // Des caractères de contrôle prouvent que ce n'était pas du texte encodé.
+    // eslint-disable-next-line no-control-regex
     if (/[\u0000-\u0008\u000E-\u001F]/.test(decoded)) return original;
     return decoded.trim() || original;
   } catch {
