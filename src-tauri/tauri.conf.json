@@ -1,0 +1,76 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LAMAYNE IPTV",
+  "mainBinaryName": "lamayne-iptv",
+  "version": "0.1.0",
+  "identifier": "com.lamayne.iptv",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "LAMAYNE IPTV",
+        "width": 1280,
+        "height": 720,
+        "transparent": true,
+        "center": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob: http: https:",
+        "font-src": "'self' data:",
+        "connect-src": "'self' ipc: http://ipc.localhost",
+        "media-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "frame-src": "'none'"
+      },
+      "devCsp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "publisher": "LAMAYNE Project",
+    "copyright": "Copyright (c) 2026 LAMAYNE IPTV contributors. MIT License.",
+    "category": "Video",
+    "shortDescription": "A personal player for your IPTV sources (Xtream, M3U)",
+    "longDescription": "LAMAYNE IPTV plays the Live TV channels, movies and series of the IPTV sources you add (Xtream Codes or M3U). It provides no content, channel or subscription.",
+    "licenseFile": "../LICENSE",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "lib/**/*"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "French",
+          "English",
+          "Spanish"
+        ],
+        "displayLanguageSelector": true
+      }
+    }
+  }
+}

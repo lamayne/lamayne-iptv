@@ -1,0 +1,30 @@
+DIFFUSION VERS LES APPAREILS GOOGLE (Chromecast, Google TV, Android TV, Nest)
+==============================================================================
+
+Etat : NON TESTE. Le code Rust n'a pas pu etre compile par son auteur.
+Il est donc DESACTIVE par defaut : sans rien faire, l'application se compile
+et fonctionne exactement comme avant, et le bouton "Diffuser" reste cache.
+
+Pour l'activer
+--------------
+1. Lancer :   npm run tauri dev -- --features cast
+2. La premiere compilation telecharge de nouvelles bibliotheques (rust_cast,
+   mdns-sd). Sous Windows, l'une d'elles (aws-lc-sys) peut demander NASM et
+   CMake. Si l'erreur le mentionne, les installer puis relancer.
+3. Si le Rust refuse de compiler, copier le message d'erreur complet a
+   l'auteur : c'est le moyen le plus rapide de corriger.
+
+Pour revenir en arriere
+-----------------------
+Lancer simplement sans l'option :   npm run tauri dev
+
+Utilisation
+-----------
+Dans le lecteur, le bouton "Diffuser" apparait a cote de l'image dans l'image.
+Il cherche les appareils Google du reseau Wi-Fi local, puis envoie le flux.
+- Les chaines en direct sont envoyees en HLS (.m3u8) : le serveur IPTV doit
+  le proposer (les serveurs Xtream le font en general).
+- Les films MP4 fonctionnent le mieux. MKV et AVI ne sont pas lus par tous
+  les appareils.
+- L'adresse du flux, qui contient les identifiants IPTV, est envoyee a
+  l'appareil choisi. Le lecteur local se met en pause pendant la diffusion.
