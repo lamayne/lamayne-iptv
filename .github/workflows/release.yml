@@ -1,22 +1,28 @@
 name: Release
 
-# Builds the Windows installers when a version tag is pushed:
-#   git tag v0.1.0 && git push origin v0.1.0
+# Builds the Windows installers and attaches them to a GitHub release.
+#
+# How to use (no Git needed):
+#   GitHub -> Releases -> Draft a new release -> choose a new tag (e.g. v0.1.0)
+#   -> Publish release. This workflow then runs and adds the installers to that
+#   release a few minutes later.
+#
+# To TEST the build without publishing anything: Actions -> Release -> Run workflow.
+# The installers are then available as workflow artifacts on the run page.
 #
 # 1. "build"  : two unsigned installers (standard, and "offline" for the
 #               Microsoft Store with WebView2 included).
 # 2. "sign"   : signing by SignPath (free for open source). Skipped while the
 #               SIGNPATH_ORGANIZATION_ID variable is not defined
 #               (see docs/PUBLISHING.md, step 3).
-# 3. "release": publication as a DRAFT, with checksums, to review before
-#               publishing it.
+# 3. "release": attaches the installers and SHA256SUMS.txt to the release.
 #
 # Important for SignPath (open source projects): every job must run on
 # GitHub-hosted machines (no self-hosted runner).
 
 on:
-  push:
-    tags: ['v*']
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -151,18 +157,18 @@ jobs:
           sha256sum *.exe > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      - name: Create the release (draft)
+      - name: Attach the installers to the release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
-          name: LAMAYNE IPTV ${{ github.ref_name }}
-          body: |
-            ${{ needs.sign.result == 'success' && '✅ Signed installers (SignPath Foundation certificate).' || '⚠️ UNSIGNED installers: Windows may show a SmartScreen warning.' }}
-
-            - `LAMAYNE-IPTV_${{ needs.build.outputs.version }}_x64-setup.exe`: standard installer (recommended).
-            - `LAMAYNE-IPTV_${{ needs.build.outputs.version }}_x64-setup-offline.exe`: offline installer (WebView2 included, used for the Microsoft Store).
-
-            See CHANGELOG.md for the list of changes. LAMAYNE IPTV provides no content.
+          tag_name: ${{ github.ref_name }}
           files: |
             release/*.exe
             release/SHA256SUMS.txt
+
+      - name: Summary
+        run: |
+          if [ "${{ needs.sign.result }}" = "success" ]; then
+            echo "Signed installers (SignPath Foundation certificate) were attached to the release." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "UNSIGNED installers were attached to the release: mention it in the release notes (Windows may show a SmartScreen warning)." >> "$GITHUB_STEP_SUMMARY"
+          fi
