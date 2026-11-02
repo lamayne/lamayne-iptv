@@ -1,0 +1,8 @@
+{
+  "app": { "macOSPrivateApi": true },
+  "bundle": {
+    "targets": ["app"],
+    "category": "Video",
+    "macOS": { "minimumSystemVersion": "11.0" }
+  }
+}
