@@ -1,0 +1,55 @@
+name: macOS test build (experimental)
+
+# Builds an UNSIGNED macOS app, for testing only. Manual run:
+#   Actions -> macOS test build -> Run workflow.
+# The result is a downloadable workflow artifact; nothing is published.
+# Status: experimental. The mpv plugin documents macOS as "not tested".
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      # libmpv itself comes from Homebrew; the plugin only downloads its wrapper.
+      - name: Install mpv (libmpv)
+        run: brew install mpv
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Download the libmpv wrapper
+        run: npx tauri-plugin-libmpv-api setup-lib
+
+      - name: Build the app
+        run: pnpm tauri build --bundles app
+
+      - name: Zip the app
+        run: |
+          mkdir -p dist
+          cd src-tauri/target/release/bundle/macos
+          ditto -c -k --keepParent "LAMAYNE IPTV.app" "$GITHUB_WORKSPACE/dist/LAMAYNE-IPTV-macos-test.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-test-build
+          path: dist/LAMAYNE-IPTV-macos-test.zip
+          if-no-files-found: error
