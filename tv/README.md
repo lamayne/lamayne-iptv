@@ -2,7 +2,7 @@
 
 A native Android TV app (Kotlin, Jetpack Compose for TV, Media3/ExoPlayer). It works
 on Android 5.0 and later. This is the first test build: sign in with an Xtream account,
-browse live categories and channels, play a channel.
+browse live categories and channels, favourites, recent channels, search, the programme guide (now / next), and play with on-screen controls (pause, previous / next channel, favourite; up / down to zap).
 
 - Built by GitHub Actions: **Actions -> Android TV build (test) -> Run workflow**.
 - The result is attached to the pre-release `tv-test` as `LAMAYNE-TV-test.apk`.
