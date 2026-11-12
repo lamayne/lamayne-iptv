@@ -361,6 +361,9 @@ export const en: Record<string, string> = {
   'movies.toFavorites': 'favorites',
   'movies.tous_les_films_sont_masques': 'All movies are hidden',
   'movies.vodDescription': 'Video on demand',
+    'movie.actor_loading': 'Looking up the filmography…',
+  'movie.actor_source': 'Filmography: Wikidata. Only titles present in your catalog are shown.',
+  'movie.actor_error': 'Filmography unavailable: only movies you have already opened are shown.',
   // nav
   'nav.a_propos': 'About',
   'nav.allChannels': 'All channels',
