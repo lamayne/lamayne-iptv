@@ -22,8 +22,8 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
-
+      # The runner already has the Android SDK (main licence accepted): Gradle
+      # downloads the missing platform by itself.
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.10.2
