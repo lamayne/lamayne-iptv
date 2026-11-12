@@ -52,3 +52,86 @@ fun ratingText(raw: String?): String? {
 
     return if (value > 0) String.format(Locale.US, "%.1f", value) else null
 }
+
+// ---------------------------------------------------------------- live channels (same rules as the Windows app)
+
+data class ChannelLabel(val name: String, val quality: String)
+
+private val PREFIX_TOKENS = setOf(
+    "FR", "BE", "CH", "CA", "UK", "GB", "US", "USA", "DE", "ES", "IT", "PT", "NL", "PL", "RO", "GR",
+    "TR", "BR", "MX", "AR", "MA", "DZ", "TN", "AL", "AT", "AU", "BG", "CZ", "DK", "FI", "HR", "HU",
+    "IE", "IN", "JP", "KR", "NO", "NZ", "RS", "RU", "SE", "SI", "SK", "UA", "ZA",
+    "SD", "HD", "FHD", "FULL HD", "UHD", "4K", "8K", "HEVC", "H264", "H265",
+)
+private val QUALITY_ANY = Regex("(?i)\\b(?:FULL\\s+HD|8K|4K|UHD|FHD|HD|SD|HEVC|H264|H265)\\b")
+private val BRACKET_PREFIX = Regex("^(?:\\[([^\\]]+)\\]|\\(([^)]+)\\))\\s*")
+private val EMPTY_BRACKETS = Regex("\\[\\s*\\]|\\(\\s*\\)")
+private val EDGE_JUNK = Regex("^[\\s|=:>_-]+|[\\s|=:>_-]+$")
+private val SPACES = Regex("\\s+")
+private val TOKEN_SPLIT = Regex("[\\s:/_-]+")
+
+private fun isTechnicalPrefix(value: String): Boolean {
+    val normalized = value.trim().replace(SPACES, " ").uppercase()
+
+    if (normalized in PREFIX_TOKENS) return true
+
+    val tokens = normalized.split(TOKEN_SPLIT).filter { it.isNotEmpty() }
+
+    return tokens.isNotEmpty() && tokens.all { it in PREFIX_TOKENS }
+}
+
+// "|FR|FHD|= TF1" -> name "TF1", quality "FHD". Only recognised parts are removed:
+// an unknown prefix is kept.
+fun channelLabel(original: String): ChannelLabel {
+    var name = original.trim()
+    val quality = when {
+        Regex("(?i)\\b8K\\b").containsMatchIn(name) -> "8K"
+        Regex("(?i)\\b4K\\b").containsMatchIn(name) -> "4K"
+        Regex("(?i)\\bUHD\\b").containsMatchIn(name) -> "UHD"
+        Regex("(?i)\\bFHD\\b|\\bFULL\\s+HD\\b").containsMatchIn(name) -> "FHD"
+        Regex("(?i)\\bHD\\b").containsMatchIn(name) -> "HD"
+        Regex("(?i)\\bSD\\b").containsMatchIn(name) -> "SD"
+        else -> ""
+    }
+
+    if (name.startsWith("|")) {
+        val segments = name.split("|")
+        var position = 1
+        var removed = false
+
+        while (position < segments.size - 1 && isTechnicalPrefix(segments[position])) {
+            position += 1
+            removed = true
+        }
+
+        if (removed) name = segments.drop(position).joinToString("|")
+    }
+
+    var changed = true
+
+    while (changed) {
+        changed = false
+
+        val trimmed = name.trimStart()
+        val match = BRACKET_PREFIX.find(trimmed)
+        val token = match?.groupValues?.get(1)?.ifEmpty { null } ?: match?.groupValues?.get(2)?.ifEmpty { null }
+
+        if (match != null && token != null && isTechnicalPrefix(token)) {
+            name = trimmed.substring(match.value.length)
+            changed = true
+        }
+    }
+
+    name = name
+        .replace(QUALITY_ANY, " ")
+        .replace(EMPTY_BRACKETS, " ")
+        .replace(EDGE_JUNK, "")
+        .replace(SPACES, " ")
+        .trim()
+
+    if (name.isEmpty()) name = original.trim().ifEmpty { "TV" }
+
+    return ChannelLabel(name, quality)
+}
+
+fun channelName(raw: String): String = channelLabel(raw).name

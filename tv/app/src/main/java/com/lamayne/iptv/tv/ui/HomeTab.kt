@@ -1,6 +1,7 @@
 package com.lamayne.iptv.tv.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -26,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -67,6 +70,13 @@ fun HomeTab(viewModel: MainViewModel) {
     }
     var pendingResume by remember { mutableStateOf<WatchProgress?>(null) }
     val heroFocus = remember { FocusRequester() }
+    val epgMap by viewModel.epgMap.collectAsStateWithLifecycle()
+    val epgVersion by viewModel.epgVersion.collectAsStateWithLifecycle()
+
+    // The favourite channels show what is on now.
+    LaunchedEffect(favChannels, epgVersion) {
+        favChannels.take(30).forEach { viewModel.requestEpg(it.id) }
+    }
 
     LaunchedEffect(featured.isNotEmpty()) {
         if (featured.isNotEmpty()) runCatching { heroFocus.requestFocus() }
@@ -117,10 +127,13 @@ fun HomeTab(viewModel: MainViewModel) {
         if (favChannels.isNotEmpty()) {
             item {
                 ContentRow(stringResource(R.string.home_my_channels), favChannels) { channel ->
+                    val now = epgMap[channel.id]?.now
+
                     ChannelTile(
                         channel = channel,
-                        modifier = Modifier.width(128.dp),
-                        favorite = false,
+                        modifier = Modifier.width(132.dp),
+                        nowTitle = now?.title,
+                        nowProgress = now?.progress(System.currentTimeMillis() / 1000),
                         onClick = { viewModel.playLive(channel, favChannels) },
                     )
                 }
@@ -201,8 +214,8 @@ fun HomeTab(viewModel: MainViewModel) {
     }
 }
 
-// The big banner: one movie or series at a time. It changes by itself every few
-// seconds, and left / right change it by hand.
+// The big banner: one movie or series at a time, on a rounded card. It changes by
+// itself every few seconds, and left / right change it by hand.
 @Composable
 private fun Hero(
     featured: List<Featured>,
@@ -246,11 +259,15 @@ private fun Hero(
     }
 
     val slide = featured[index % count]
+    val shape = RoundedCornerShape(28.dp)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(290.dp)
+            .padding(horizontal = 48.dp)
+            .height(330.dp)
+            .clip(shape)
+            .border(1.dp, Color(0x26FFFFFF), shape)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown || count < 2) {
                     false
@@ -269,14 +286,15 @@ private fun Hero(
                 }
             },
     ) {
-        PosterImage(slide.backdrop, slide.title, Modifier.fillMaxSize())
+        // The top of the picture stays visible: only the bottom is cut when it is too tall.
+        PosterImage(slide.backdrop, slide.title, Modifier.fillMaxSize(), alignment = BiasAlignment(0f, -0.7f))
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.horizontalGradient(
-                        listOf(Color(0xF20A0A12), Color(0xB30A0A12), Color.Transparent)
+                        listOf(Color(0xF50A0A12), Color(0xCC0A0A12), Color(0x330A0A12), Color.Transparent)
                     )
                 ),
         )
@@ -284,15 +302,15 @@ private fun Hero(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xFF0A0A12)))),
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC0A0A12)))),
         )
 
-        // The text sits at the bottom of the banner: the title is always visible.
+        // The text sits at the bottom of the card: the title is always visible.
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 48.dp, bottom = 22.dp)
-                .width(560.dp),
+                .padding(start = 36.dp, bottom = 28.dp)
+                .width(520.dp),
         ) {
             Text(
                 stringResource(
@@ -301,7 +319,7 @@ private fun Hero(
                 color = AccentBright,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
+                letterSpacing = 3.sp,
             )
 
             Spacer(Modifier.height(4.dp))
@@ -309,19 +327,34 @@ private fun Hero(
             Text(
                 displayName(slide.title),
                 color = Color.White,
-                fontSize = 30.sp,
+                fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
+                lineHeight = 36.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
 
             if (slide.meta.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                Text(slide.meta, color = Color(0xFFD0D0E0), fontSize = 14.sp, maxLines = 1)
+                Spacer(Modifier.height(8.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (chip in slide.meta.split("  \u2022  ").take(4)) {
+                        Text(
+                            chip,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .background(Color(0x33FFFFFF), RoundedCornerShape(50))
+                                .padding(horizontal = 10.dp, vertical = 3.dp),
+                        )
+                    }
+                }
             }
 
             if (!slide.plot.isNullOrBlank()) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     slide.plot,
                     color = Color(0xFFE0E0EC),
@@ -331,7 +364,7 @@ private fun Hero(
                 )
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(16.dp))
 
             ActionButton(
                 text = stringResource(R.string.details_play),
@@ -354,14 +387,15 @@ private fun Hero(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 48.dp, bottom = 26.dp),
+                    .padding(end = 32.dp, bottom = 32.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 for (position in 0 until count) {
                     Box(
                         modifier = Modifier
-                            .size(if (position == index % count) 10.dp else 7.dp)
-                            .clip(CircleShape)
+                            .size(width = if (position == index % count) 22.dp else 8.dp, height = 8.dp)
+                            .clip(RoundedCornerShape(50))
                             .background(if (position == index % count) Accent else Color(0x66FFFFFF)),
                     )
                 }

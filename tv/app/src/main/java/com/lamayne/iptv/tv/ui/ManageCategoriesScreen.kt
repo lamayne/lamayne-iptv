@@ -123,7 +123,7 @@ fun ManageCategoriesScreen(viewModel: MainViewModel, kind: MediaKind) {
                             Spacer(Modifier.width(16.dp))
 
                             Text(
-                                displayName(category.name),
+                                category.name.trim(),
                                 color = if (visible) TextMain else Muted,
                                 fontSize = 17.sp,
                                 maxLines = 1,

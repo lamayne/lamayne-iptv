@@ -37,6 +37,8 @@ import com.lamayne.iptv.tv.data.toUiError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +64,20 @@ sealed interface Route {
     data class ManageCategories(val kind: MediaKind) : Route
     data class Actor(val name: String) : Route
 }
+
+// What the page of an actor shows when it is done.
+data class ActorResult(val movies: List<Movie>, val actorFound: Boolean, val filmCount: Int)
+
+enum class StepState { RUNNING, DONE, FAILED }
+
+// The three steps of the lookup, shown while the page loads.
+data class ActorProgress(
+    val lookup: StepState = StepState.RUNNING,
+    val catalogue: StepState = StepState.RUNNING,
+    val matching: StepState? = null,
+    val filmCount: Int = 0,
+    val catalogueSize: Int = 0,
+)
 
 private val ACCENT_MARKS = Regex("\\p{M}+")
 
@@ -201,7 +217,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         { c -> XtreamClient.movieCategories(c) },
         { c, id -> XtreamClient.movies(c, id) },
         { _hiddenMovies.value },
-        { list -> inContentLanguageFirst(list) },
     )
 
     val series = BrowseController<Series>(
@@ -209,7 +224,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         { c -> XtreamClient.seriesCategories(c) },
         { c, id -> XtreamClient.series(c, id) },
         { _hiddenSeries.value },
-        { list -> inContentLanguageFirst(list) },
     )
 
     // ------------------------------------------------------------------ favourites, history
@@ -265,8 +279,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val seriesInfo: StateFlow<Loadable<SeriesInfo>> = _seriesInfo.asStateFlow()
 
     // Movies of an actor (found on the filmography site, matched to the catalogue)
-    private val _actorMovies = MutableStateFlow<Loadable<List<Movie>>>(Loadable.Loading)
-    val actorMovies: StateFlow<Loadable<List<Movie>>> = _actorMovies.asStateFlow()
+    private val _actorMovies = MutableStateFlow<Loadable<ActorResult>>(Loadable.Loading)
+    val actorMovies: StateFlow<Loadable<ActorResult>> = _actorMovies.asStateFlow()
+
+    private val _actorProgress = MutableStateFlow(ActorProgress())
+    val actorProgress: StateFlow<ActorProgress> = _actorProgress.asStateFlow()
+
+    // Bumped by "update the guide": the channel lists ask for their programmes again.
+    private val _epgVersion = MutableStateFlow(0)
+    val epgVersion: StateFlow<Int> = _epgVersion.asStateFlow()
 
     // ------------------------------------------------------------------ search
 
@@ -296,7 +317,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         MediaKind.SERIES to Mutex(),
     )
     private var movieTitleMap: Map<String, List<Pair<Movie, Int?>>>? = null
-    private val filmographyCache = HashMap<String, List<Filmography.Film>>()
+    private val filmographyCache = HashMap<String, Filmography.Result>()
 
     private var homeJob: Job? = null
     private var playingEpgJob: Job? = null
@@ -416,12 +437,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return if (chosen != "system") chosen else Locale.getDefault().language
     }
 
-    private fun inContentLanguageFirst(categories: List<Category>): List<Category> {
-        val tags = tagsFor(contentLanguage())
-
-        return categories.sortedBy { if (categoryTag(it.name) in tags) 0 else 1 }
-    }
-
     // Changing the language reloads what depends on it.
     fun setLanguage(code: String) {
         settings.language = code
@@ -443,17 +458,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun browseMode(kind: MediaKind): Int? = browseModes[kind]
 
+    // The last item opened in each list: coming back, the cursor returns on it.
+    private val lastItems = HashMap<MediaKind, String>()
+
+    fun lastItem(kind: MediaKind): String? = lastItems[kind]
+
     fun rememberBrowseMode(kind: MediaKind, mode: Int) {
         browseModes[kind] = mode
+        lastItems.remove(kind)
+    }
+
+    private fun forgetBrowsing(kind: MediaKind) {
+        browseModes.remove(kind)
+        lastItems.remove(kind)
     }
 
     fun selectTab(tab: Tab) {
         val credentials = _credentials.value
 
         when (tab) {
-            Tab.LIVE -> browseModes.remove(MediaKind.LIVE)
-            Tab.MOVIES -> browseModes.remove(MediaKind.MOVIE)
-            Tab.SERIES -> browseModes.remove(MediaKind.SERIES)
+            Tab.LIVE -> forgetBrowsing(MediaKind.LIVE)
+            Tab.MOVIES -> forgetBrowsing(MediaKind.MOVIE)
+            Tab.SERIES -> forgetBrowsing(MediaKind.SERIES)
             else -> Unit
         }
 
@@ -485,11 +511,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openMovie(movie: Movie) {
+        lastItems[MediaKind.MOVIE] = movie.id
         push(Route.MovieDetails(movie))
         loadMovieInfo(movie)
+
+        // The movie list is prepared in the background: the page of an actor then opens fast.
+        viewModelScope.launch {
+            try {
+                ensureIndex(MediaKind.MOVIE)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // not needed now
+            }
+        }
     }
 
     fun openSeries(series: Series) {
+        lastItems[MediaKind.SERIES] = series.id
         push(Route.SeriesDetails(series))
         loadSeriesInfo(series)
     }
@@ -629,6 +668,53 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ------------------------------------------------------------------ refresh
+
+    // Lists are downloaded again the next time they are opened (Live TV right away).
+    fun refresh(kind: MediaKind) {
+        val credentials = _credentials.value ?: return
+
+        indexLoaded.remove(kind)
+
+        when (kind) {
+            MediaKind.LIVE -> {
+                channelIndex.set(emptyList())
+                live.reset()
+                live.start(credentials)
+            }
+            MediaKind.SERIES -> {
+                seriesIndex.set(emptyList())
+                seriesInfoCache.clear()
+                series.reset()
+            }
+            else -> {
+                movieIndex.set(emptyList())
+                movieTitleMap = null
+                movies.reset()
+            }
+        }
+
+        if (kind != MediaKind.LIVE) loadHome(credentials)
+    }
+
+    fun refreshAll() {
+        val credentials = _credentials.value ?: return
+
+        refresh(MediaKind.LIVE)
+        refresh(MediaKind.MOVIE)
+        refresh(MediaKind.SERIES)
+        refreshGuide()
+        loadHome(credentials)
+    }
+
+    // The programmes of every channel are asked again.
+    fun refreshGuide() {
+        epgCache.clear()
+        epgInFlight.clear()
+        _epgMap.value = emptyMap()
+        _epgVersion.value = _epgVersion.value + 1
+    }
+
     // ------------------------------------------------------------------ favourites
 
     fun toggleFavorite(channel: Channel) {
@@ -674,6 +760,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ------------------------------------------------------------------ live playback
 
     fun playLive(channel: Channel, list: List<Channel>) {
+        lastItems[MediaKind.LIVE] = channel.id
         queue = if (list.any { it.id == channel.id }) list else listOf(channel)
         startLive(channel)
     }
@@ -1086,18 +1173,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ------------------------------------------------------------------ actors
 
+    // The film list of the actor and the movie catalogue are loaded at the same time.
     fun openActor(name: String) {
         push(Route.Actor(name))
         actorJob?.cancel()
         _actorMovies.value = Loadable.Loading
+        _actorProgress.value = ActorProgress()
         actorJob = viewModelScope.launch {
             try {
-                ensureIndex(MediaKind.MOVIE)
+                coroutineScope {
+                    val catalogue = async {
+                        try {
+                            ensureIndex(MediaKind.MOVIE)
+                            _actorProgress.value = _actorProgress.value.copy(
+                                catalogue = StepState.DONE,
+                                catalogueSize = movieIndex.size,
+                            )
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            _actorProgress.value = _actorProgress.value.copy(catalogue = StepState.FAILED)
+                            throw e
+                        }
+                    }
 
-                val films = filmographyCache[name] ?: Filmography.fetch(name).also { filmographyCache[name] = it }
-                val matches = withContext(Dispatchers.Default) { matchFilms(films) }
+                    val result = filmographyCache[name] ?: try {
+                        Filmography.fetch(name).also { filmographyCache[name] = it }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        _actorProgress.value = _actorProgress.value.copy(lookup = StepState.FAILED)
+                        throw e
+                    }
 
-                _actorMovies.value = Loadable.Ready(matches)
+                    _actorProgress.value = _actorProgress.value.copy(
+                        lookup = StepState.DONE,
+                        filmCount = result.films.size,
+                    )
+
+                    catalogue.await()
+                    _actorProgress.value = _actorProgress.value.copy(matching = StepState.RUNNING)
+
+                    val matches = withContext(Dispatchers.Default) { matchFilms(result.films) }
+
+                    _actorProgress.value = _actorProgress.value.copy(matching = StepState.DONE)
+                    _actorMovies.value = Loadable.Ready(ActorResult(matches, result.actorFound, result.films.size))
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

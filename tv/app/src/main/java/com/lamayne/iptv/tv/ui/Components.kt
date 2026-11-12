@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -76,6 +77,7 @@ fun FocusCard(
             scaleX = scale
             scaleY = scale
         }
+        .shadow(if (focused) 16.dp else 0.dp, shape, ambientColor = borderColor, spotColor = borderColor)
         .clip(shape)
         .background(if (focused) focusedContainer else container)
         .border(BorderStroke(3.dp, border), shape)
@@ -153,46 +155,6 @@ fun ProgressLine(fraction: Float, modifier: Modifier = Modifier) {
     }
 }
 
-// The app emblem (copied from the repository at build time), or a drawn
-// substitute when it is not there.
-@Composable
-fun BrandMark(size: Dp) {
-    val context = LocalContext.current
-    val resId = remember {
-        context.resources.getIdentifier("lamayne_emblem", "drawable", context.packageName)
-    }
-
-    if (resId != 0) {
-        AsyncImage(
-            model = resId,
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .size(size)
-                .clip(RoundedCornerShape(size * 0.22f)),
-        )
-    } else {
-        Canvas(modifier = Modifier.size(size)) {
-            val w = this.size.width
-            val h = this.size.height
-
-            drawRoundRect(
-                brush = Brush.linearGradient(listOf(Color(0xFF8B5CF6), Color(0xFF4F46E5))),
-                cornerRadius = CornerRadius(w * 0.22f, w * 0.22f),
-            )
-
-            val triangle = Path().apply {
-                moveTo(w * 0.38f, h * 0.28f)
-                lineTo(w * 0.74f, h * 0.5f)
-                lineTo(w * 0.38f, h * 0.72f)
-                close()
-            }
-
-            drawPath(triangle, Color.White)
-        }
-    }
-}
-
 @Composable
 fun Wordmark() {
     Column {
@@ -226,7 +188,7 @@ fun ChannelLogo(channel: Channel, modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    initials(channel.name),
+                    initials(channelName(channel.name)),
                     color = Color.White,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,

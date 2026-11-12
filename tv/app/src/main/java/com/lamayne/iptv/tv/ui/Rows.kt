@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -82,14 +83,32 @@ fun ChannelRow(
             Spacer(Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    displayName(channel.name),
-                    color = TextMain,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                val label = channelLabel(channel.name)
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        label.name,
+                        color = TextMain,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+
+                    if (label.quality.isNotEmpty()) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            label.quality,
+                            color = AccentBright,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .background(Color(0x338B5CF6), RoundedCornerShape(5.dp))
+                                .padding(horizontal = 6.dp, vertical = 1.dp),
+                        )
+                    }
+                }
 
                 val nowTitle = epg?.now?.title
 
@@ -251,7 +270,7 @@ fun CategoryPanel(
                     focusedScale = 1.02f,
                 ) {
                     Text(
-                        displayName(category.name),
+                        category.name.trim(),
                         color = if (selected) Color.White else TextMain,
                         fontSize = 15.sp,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
@@ -313,7 +332,7 @@ fun <T : Any> BrowsePage(
     searchHint: Int,
     onSelectCategory: (Category) -> Unit,
     onRetry: () -> Unit,
-    content: @Composable (List<T>, FocusRequester) -> Unit,
+    content: @Composable (List<T>, Int, FocusRequester) -> Unit,
 ) {
     val categories by controller.categories.collectAsStateWithLifecycle()
     val selected by controller.selected.collectAsStateWithLifecycle()
@@ -342,8 +361,16 @@ fun <T : Any> BrowsePage(
         BrowseMode.CATEGORY -> items
     }
 
+    // Coming back from a movie page: the cursor returns on the poster that was opened.
+    val startIndex = remember(shown, mode) {
+        viewModel.lastItem(kind)
+            ?.let { id -> shown.indexOfFirst { idOf(it) == id } }
+            ?.takeIf { it >= 0 }
+            ?: 0
+    }
+
     FocusFirstWhen(
-        key = Pair(mode, shown.firstOrNull()?.let(idOf)),
+        key = Triple(mode, shown.firstOrNull()?.let(idOf), startIndex),
         enabled = mode != BrowseMode.SEARCH && shown.isNotEmpty(),
         requester = firstFocus,
     )
@@ -384,7 +411,7 @@ fun <T : Any> BrowsePage(
             val title = when (mode) {
                 BrowseMode.FAVORITES -> stringResource(R.string.browse_favorites)
                 BrowseMode.SEARCH -> stringResource(R.string.browse_search)
-                BrowseMode.CATEGORY -> selected?.let { displayName(it.name) } ?: stringResource(panelTitle)
+                BrowseMode.CATEGORY -> selected?.name?.trim() ?: stringResource(panelTitle)
             }
 
             ListHeader(
@@ -443,7 +470,9 @@ fun <T : Any> BrowsePage(
                     BrowseMode.CATEGORY -> MessageBlock(stringResource(R.string.browse_empty), "")
                 }
 
-                else -> content(shown, firstFocus)
+                else -> key(Pair(mode, shown.firstOrNull()?.let(idOf))) {
+                    content(shown, startIndex, firstFocus)
+                }
             }
         }
     }

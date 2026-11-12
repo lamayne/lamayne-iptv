@@ -1,11 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LAMAYNE IPTV</string>
-    <string name="actor_loading">Looking up the filmography...</string>
-    <string name="actor_loading_hint">The first time, the whole movie list is loaded: it can take a few seconds.</string>
+    <string name="actor_elapsed">%1$d s</string>
+    <string name="actor_loading_hint">It is working. Press Back to cancel.</string>
     <string name="actor_none">No movie found</string>
-    <string name="actor_none_hint">None of this actor’s films is in your catalogue, or their titles differ.</string>
+    <string name="actor_none_hint">None of this actor’s %1$d known films is in your catalogue, or their titles differ.</string>
+    <string name="actor_not_found">Actor not found</string>
+    <string name="actor_not_found_hint">The filmography site does not know this person as an actor.</string>
     <string name="actor_note">Filmography: Wikidata. Only the titles found in your catalogue are shown.</string>
+    <string name="actor_slow_hint">Still working: a large catalogue can take up to a minute. Press Back to cancel.</string>
+    <string name="actor_step_catalogue_done">Catalogue ready: %1$d movies</string>
+    <string name="actor_step_catalogue_failed">Catalogue could not be loaded</string>
+    <string name="actor_step_catalogue_running">Loading your movie catalogue… (first time only)</string>
+    <string name="actor_step_lookup_done">Filmography found: %1$d films</string>
+    <string name="actor_step_lookup_failed">Filmography unavailable (no connection?)</string>
+    <string name="actor_step_lookup_running">Looking up the filmography…</string>
+    <string name="actor_step_match_done">Titles matched</string>
+    <string name="actor_step_match_running">Matching the titles with your catalogue…</string>
+    <string name="actor_summary">%1$d of %2$d films are in your catalogue</string>
     <string name="actor_title">Movies with %1$s</string>
     <string name="actor_unavailable">Filmography unavailable</string>
     <string name="browse_empty">Nothing in this category</string>
@@ -33,6 +45,10 @@
     <string name="error_load_title">Could not load the content</string>
     <string name="fav_empty_hint">Select the heart on a channel, movie or series to keep it here.</string>
     <string name="fav_empty_title">No favourite yet</string>
+    <string name="guide_empty">No programme information</string>
+    <string name="guide_left">%1$d min left</string>
+    <string name="guide_next">Next</string>
+    <string name="guide_now">Now</string>
     <string name="home_continue">Continue watching</string>
     <string name="home_latest_movies">Latest movies</string>
     <string name="home_latest_series">Latest series</string>
@@ -45,7 +61,6 @@
     <string name="kind_series">Series</string>
     <string name="live_categories">Live TV categories</string>
     <string name="live_count">%1$d channels</string>
-    <string name="live_next">Next</string>
     <string name="live_no_guide">No programme information</string>
     <string name="login_connect">Connect</string>
     <string name="login_connecting">Connecting...</string>
@@ -70,12 +85,15 @@
     <string name="player_back_hint">Press Back to return.</string>
     <string name="player_cannot_play">This channel cannot be played</string>
     <string name="player_cannot_play_vod">This video cannot be played</string>
+    <string name="player_close">Close</string>
     <string name="player_hint_live">Up / Down: change channel     Back: close</string>
     <string name="player_hint_vod">Left / Right: 10 s     Back: close</string>
-    <string name="player_no_tracks">No other track in this video.</string>
+    <string name="player_no_audio">No other audio track in this video.</string>
+    <string name="player_no_subtitles">No subtitles available in this video.</string>
     <string name="player_off">Off</string>
     <string name="player_subtitles">Subtitles</string>
     <string name="player_try_other">Press Up or Down to try another channel, Back to return.</string>
+    <string name="player_unsupported">not supported by this TV</string>
     <string name="resume_title">Resume playback?</string>
     <string name="search_hint_live">Search a channel</string>
     <string name="search_hint_movies">Search a movie</string>
@@ -96,8 +114,23 @@
     <string name="settings_language">Language</string>
     <string name="settings_language_auto">Automatic</string>
     <string name="settings_language_hint">The movies and series suggested on the home page follow this language.</string>
+    <string name="settings_news_open">News (Linktree)</string>
+    <string name="settings_no_browser">No browser on this TV: scan the code with your phone.</string>
+    <string name="settings_refresh">Update</string>
+    <string name="settings_refresh_all">Update everything</string>
+    <string name="settings_refresh_guide">TV guide (EPG)</string>
+    <string name="settings_refresh_hint">Download the lists again from your provider (new channels, movies and series).</string>
+    <string name="settings_refresh_live">Live TV</string>
+    <string name="settings_refresh_movies">Movies</string>
+    <string name="settings_refresh_series">Series</string>
+    <string name="settings_refreshed">Updating… the lists reload when you open them.</string>
+    <string name="settings_scan">Scan the code with your phone.</string>
     <string name="settings_sign_out">Sign out</string>
+    <string name="settings_support">Support the project</string>
+    <string name="settings_support_open">Open the link</string>
+    <string name="settings_support_text">If the app is useful to you, you can support its future updates on Buy Me a Coffee.</string>
     <string name="settings_version">version %1$s</string>
     <string name="settings_visible">Visible content</string>
     <string name="settings_visible_hint">Providers send hundreds of categories. Choose the ones you want to see.</string>
+    <string name="splash_loading">Loading…</string>
 </resources>

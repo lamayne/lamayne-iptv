@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,6 +25,7 @@ fun LiveTab(viewModel: MainViewModel) {
     val favorites by viewModel.favChannels.collectAsStateWithLifecycle()
     val results by viewModel.searchChannels.collectAsStateWithLifecycle()
     val favoriteIds = remember(favorites) { favorites.map { it.id }.toSet() }
+    val epgVersion by viewModel.epgVersion.collectAsStateWithLifecycle()
 
     BrowsePage(
         viewModel = viewModel,
@@ -38,21 +40,24 @@ fun LiveTab(viewModel: MainViewModel) {
         searchHint = R.string.search_hint_live,
         onSelectCategory = { viewModel.selectLiveCategory(it) },
         onRetry = { viewModel.retry(Tab.LIVE) },
-    ) { list, firstFocus ->
+    ) { list, startIndex, firstFocus ->
+        val listState = rememberLazyListState(initialFirstVisibleItemIndex = startIndex)
+
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             itemsIndexed(list) { index, channel ->
                 // Each visible line asks for its own programme (3 at a time).
-                LaunchedEffect(channel.id) { viewModel.requestEpg(channel.id) }
+                LaunchedEffect(channel.id, epgVersion) { viewModel.requestEpg(channel.id) }
 
                 ChannelRow(
                     channel = channel,
                     epg = epgMap[channel.id],
                     favorite = favoriteIds.contains(channel.id),
-                    focusRequester = if (index == 0) firstFocus else null,
+                    focusRequester = if (index == startIndex) firstFocus else null,
                     onClick = { viewModel.playLive(channel, list) },
                 )
             }

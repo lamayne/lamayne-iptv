@@ -55,7 +55,7 @@ fun LamayneTheme(content: @Composable () -> Unit) {
     }
 }
 
-// Dark background with a soft violet glow in the top-left corner.
+// Dark background with two soft glows: violet at the top left, indigo at the bottom right.
 @Composable
 fun AppBackground() {
     Box(
@@ -64,9 +64,16 @@ fun AppBackground() {
             .background(Bg)
             .background(
                 Brush.radialGradient(
-                    colors = listOf(Color(0x558B5CF6), Color.Transparent),
+                    colors = listOf(Color(0x668B5CF6), Color.Transparent),
                     center = Offset(0f, 0f),
                     radius = 1500f,
+                )
+            )
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(Color(0x334F46E5), Color.Transparent),
+                    center = Offset(2400f, 1500f),
+                    radius = 1700f,
                 )
             ),
     )

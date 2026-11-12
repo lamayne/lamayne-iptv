@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -42,8 +43,11 @@ fun MoviesTab(viewModel: MainViewModel) {
         searchHint = R.string.search_hint_movies,
         onSelectCategory = { viewModel.selectMovieCategory(it) },
         onRetry = { viewModel.retry(Tab.MOVIES) },
-    ) { list, firstFocus ->
+    ) { list, startIndex, firstFocus ->
+        val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = startIndex)
+
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Adaptive(142.dp),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 30.dp),
@@ -58,7 +62,7 @@ fun MoviesTab(viewModel: MainViewModel) {
                     favorite = favoriteIds.contains(movie.id),
                     rating = ratingText(movie.rating),
                     progress = progressById[movie.id]?.fraction,
-                    focusRequester = if (index == 0) firstFocus else null,
+                    focusRequester = if (index == startIndex) firstFocus else null,
                     onClick = { viewModel.openMovie(movie) },
                 )
             }
@@ -86,9 +90,12 @@ fun SeriesTab(viewModel: MainViewModel) {
         searchHint = R.string.search_hint_series,
         onSelectCategory = { viewModel.selectSeriesCategory(it) },
         onRetry = { viewModel.retry(Tab.SERIES) },
-    ) { list, firstFocus ->
+    ) { list, startIndex, firstFocus ->
+        val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = startIndex)
+
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(142.dp),
+            state = gridState,
+            columns = GridCells.Adaptive(90.dp),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 30.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -101,7 +108,7 @@ fun SeriesTab(viewModel: MainViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                     favorite = favoriteIds.contains(item.id),
                     rating = ratingText(item.rating),
-                    focusRequester = if (index == 0) firstFocus else null,
+                    focusRequester = if (index == startIndex) firstFocus else null,
                     onClick = { viewModel.openSeries(item) },
                 )
             }

@@ -1,14 +1,21 @@
 package com.lamayne.iptv.tv.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lamayne.iptv.tv.MainViewModel
+import kotlinx.coroutines.delay
 import com.lamayne.iptv.tv.Route
 import com.lamayne.iptv.tv.data.MediaKind
 import com.lamayne.iptv.tv.data.Movie
@@ -27,6 +34,22 @@ fun LamayneApp(viewModel: MainViewModel) {
     val account = credentials
     val channel = playing
     val route = stack.lastOrNull()
+
+    var showSplash by remember { mutableStateOf(true) }
+
+    // The logo stays at least two seconds, longer while the home page is still loading.
+    LaunchedEffect(Unit) {
+        delay(2300)
+
+        var waited = 0
+
+        while (waited < 5000 && viewModel.credentials.value != null && viewModel.homeLoading.value) {
+            delay(100)
+            waited += 100
+        }
+
+        showSplash = false
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         AppBackground()
@@ -98,6 +121,10 @@ fun LamayneApp(viewModel: MainViewModel) {
             route is Route.Actor -> ActorScreen(viewModel, route.name)
 
             else -> MainScreen(viewModel)
+        }
+
+        AnimatedVisibility(visible = showSplash, exit = fadeOut(tween(700))) {
+            SplashScreen()
         }
     }
 }

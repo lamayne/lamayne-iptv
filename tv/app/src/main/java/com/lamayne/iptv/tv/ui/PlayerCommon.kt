@@ -58,6 +58,7 @@ data class TrackOption(
     val index: Int,
     val label: String,
     val selected: Boolean,
+    val supported: Boolean,
 )
 
 private fun trackLabel(format: Format, number: Int, isAudio: Boolean): String {
@@ -89,14 +90,13 @@ fun trackOptions(tracks: Tracks?, type: Int): List<TrackOption> {
         if (group.type != type) continue
 
         for (index in 0 until group.length) {
-            if (!group.isTrackSupported(index)) continue
-
             options.add(
                 TrackOption(
                     group = group,
                     index = index,
                     label = trackLabel(group.getTrackFormat(index), options.size + 1, type == C.TRACK_TYPE_AUDIO),
                     selected = group.isTrackSelected(index),
+                    supported = group.isTrackSupported(index),
                 )
             )
         }
@@ -106,6 +106,8 @@ fun trackOptions(tracks: Tracks?, type: Int): List<TrackOption> {
 }
 
 fun selectTrack(player: ExoPlayer, option: TrackOption) {
+    if (!option.supported) return
+
     player.trackSelectionParameters = player.trackSelectionParameters
         .buildUpon()
         .setTrackTypeDisabled(option.group.type, false)

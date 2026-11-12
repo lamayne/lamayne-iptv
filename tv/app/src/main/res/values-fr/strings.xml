@@ -1,11 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LAMAYNE IPTV</string>
-    <string name="actor_loading">Recherche de la filmographie…</string>
-    <string name="actor_loading_hint">La première fois, toute la liste des films est chargée : cela peut prendre quelques secondes.</string>
+    <string name="actor_elapsed">%1$d s</string>
+    <string name="actor_loading_hint">Ça travaille. Retour pour annuler.</string>
     <string name="actor_none">Aucun film trouvé</string>
-    <string name="actor_none_hint">Aucun film de cet acteur dans votre catalogue, ou leurs titres diffèrent.</string>
+    <string name="actor_none_hint">Aucun des %1$d films connus de cet acteur n’est dans votre catalogue, ou leurs titres diffèrent.</string>
+    <string name="actor_not_found">Acteur introuvable</string>
+    <string name="actor_not_found_hint">Le site de filmographie ne connaît pas cette personne comme acteur.</string>
     <string name="actor_note">Filmographie : Wikidata. Seuls les titres présents dans votre catalogue sont affichés.</string>
+    <string name="actor_slow_hint">Toujours en cours : un gros catalogue peut prendre jusqu’à une minute. Retour pour annuler.</string>
+    <string name="actor_step_catalogue_done">Catalogue prêt : %1$d films</string>
+    <string name="actor_step_catalogue_failed">Le catalogue n’a pas pu être chargé</string>
+    <string name="actor_step_catalogue_running">Chargement de votre catalogue de films… (une seule fois)</string>
+    <string name="actor_step_lookup_done">Filmographie trouvée : %1$d films</string>
+    <string name="actor_step_lookup_failed">Filmographie indisponible (pas de connexion ?)</string>
+    <string name="actor_step_lookup_running">Recherche de la filmographie…</string>
+    <string name="actor_step_match_done">Titres comparés</string>
+    <string name="actor_step_match_running">Comparaison des titres avec votre catalogue…</string>
+    <string name="actor_summary">%1$d films sur %2$d sont dans votre catalogue</string>
     <string name="actor_title">Films avec %1$s</string>
     <string name="actor_unavailable">Filmographie indisponible</string>
     <string name="browse_empty">Rien dans cette catégorie</string>
@@ -33,6 +45,10 @@
     <string name="error_load_title">Impossible de charger le contenu</string>
     <string name="fav_empty_hint">Sélectionnez le cœur sur une chaîne, un film ou une série pour le garder ici.</string>
     <string name="fav_empty_title">Aucun favori pour le moment</string>
+    <string name="guide_empty">Pas d’information de programme</string>
+    <string name="guide_left">Encore %1$d min</string>
+    <string name="guide_next">Ensuite</string>
+    <string name="guide_now">En ce moment</string>
     <string name="home_continue">Reprendre la lecture</string>
     <string name="home_latest_movies">Derniers films</string>
     <string name="home_latest_series">Dernières séries</string>
@@ -45,7 +61,6 @@
     <string name="kind_series">Série</string>
     <string name="live_categories">Catégories Live TV</string>
     <string name="live_count">%1$d chaînes</string>
-    <string name="live_next">Ensuite</string>
     <string name="live_no_guide">Pas d\'information de programme</string>
     <string name="login_connect">Se connecter</string>
     <string name="login_connecting">Connexion…</string>
@@ -70,12 +85,15 @@
     <string name="player_back_hint">Appuyez sur Retour pour revenir.</string>
     <string name="player_cannot_play">Cette chaîne ne peut pas être lue</string>
     <string name="player_cannot_play_vod">Cette vidéo ne peut pas être lue</string>
+    <string name="player_close">Fermer</string>
     <string name="player_hint_live">Haut / Bas : changer de chaîne     Retour : fermer</string>
     <string name="player_hint_vod">Gauche / Droite : 10 s     Retour : fermer</string>
-    <string name="player_no_tracks">Aucune autre piste dans cette vidéo.</string>
+    <string name="player_no_audio">Aucune autre piste audio dans cette vidéo.</string>
+    <string name="player_no_subtitles">Aucun sous-titre disponible dans cette vidéo.</string>
     <string name="player_off">Désactivés</string>
     <string name="player_subtitles">Sous-titres</string>
     <string name="player_try_other">Appuyez sur Haut ou Bas pour essayer une autre chaîne, sur Retour pour revenir.</string>
+    <string name="player_unsupported">non pris en charge par cette TV</string>
     <string name="resume_title">Reprendre la lecture ?</string>
     <string name="search_hint_live">Rechercher une chaîne</string>
     <string name="search_hint_movies">Rechercher un film</string>
@@ -96,8 +114,23 @@
     <string name="settings_language">Langue</string>
     <string name="settings_language_auto">Automatique</string>
     <string name="settings_language_hint">Les films et séries proposés sur l’accueil suivent cette langue.</string>
+    <string name="settings_news_open">Actualités (Linktree)</string>
+    <string name="settings_no_browser">Pas de navigateur sur cette TV : scannez le code avec votre téléphone.</string>
+    <string name="settings_refresh">Mise à jour</string>
+    <string name="settings_refresh_all">Tout mettre à jour</string>
+    <string name="settings_refresh_guide">Guide TV (EPG)</string>
+    <string name="settings_refresh_hint">Télécharge de nouveau les listes de votre fournisseur (nouvelles chaînes, films et séries).</string>
+    <string name="settings_refresh_live">Live TV</string>
+    <string name="settings_refresh_movies">Films</string>
+    <string name="settings_refresh_series">Séries</string>
+    <string name="settings_refreshed">Mise à jour… les listes se rechargent quand vous les ouvrez.</string>
+    <string name="settings_scan">Scannez le code avec votre téléphone.</string>
     <string name="settings_sign_out">Se déconnecter</string>
+    <string name="settings_support">Soutenir le projet</string>
+    <string name="settings_support_open">Ouvrir le lien</string>
+    <string name="settings_support_text">Si l’application vous est utile, vous pouvez soutenir ses prochaines mises à jour sur Buy Me a Coffee.</string>
     <string name="settings_version">version %1$s</string>
     <string name="settings_visible">Contenu visible</string>
     <string name="settings_visible_hint">Les fournisseurs envoient des centaines de catégories. Choisissez celles que vous voulez voir.</string>
+    <string name="splash_loading">Chargement…</string>
 </resources>

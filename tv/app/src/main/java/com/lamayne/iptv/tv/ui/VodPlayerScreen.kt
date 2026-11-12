@@ -44,7 +44,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -371,15 +370,13 @@ fun VodPlayerScreen(
                         }
                     }
 
-                    if (audioOptions.size > 1) {
-                        ActionButton(
-                            text = stringResource(R.string.player_audio),
-                            onClick = { picker = 1 },
-                        )
-                    }
+                    ActionButton(
+                        text = stringResource(R.string.player_audio) + "  " + audioOptions.size,
+                        onClick = { picker = 1 },
+                    )
 
                     ActionButton(
-                        text = stringResource(R.string.player_subtitles),
+                        text = stringResource(R.string.player_subtitles) + "  " + textOptions.size,
                         onClick = { picker = 2 },
                     )
 
@@ -410,9 +407,12 @@ fun VodPlayerScreen(
             TrackPanel(
                 title = stringResource(if (isAudio) R.string.player_audio else R.string.player_subtitles),
                 options = if (isAudio) audioOptions else textOptions,
-                offLabel = if (isAudio) null else stringResource(R.string.player_off),
+                offLabel = if (isAudio || textOptions.isEmpty()) null else stringResource(R.string.player_off),
                 offSelected = !isAudio && textOptions.none { it.selected },
-                emptyLabel = stringResource(R.string.player_no_tracks),
+                emptyLabel = stringResource(if (isAudio) R.string.player_no_audio else R.string.player_no_subtitles),
+                unsupportedLabel = stringResource(R.string.player_unsupported),
+                closeLabel = stringResource(R.string.player_close),
+                onClose = { picker = 0 },
                 onOff = {
                     disableSubtitles(exoPlayer)
                     picker = 0
@@ -529,6 +529,9 @@ private fun TrackPanel(
     offLabel: String?,
     offSelected: Boolean,
     emptyLabel: String,
+    unsupportedLabel: String,
+    closeLabel: String,
+    onClose: () -> Unit,
     onOff: () -> Unit,
     onPick: (TrackOption) -> Unit,
     modifier: Modifier = Modifier,
@@ -540,17 +543,22 @@ private fun TrackPanel(
     Column(
         modifier = modifier
             .padding(32.dp)
-            .width(400.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .width(420.dp)
+            .clip(RoundedCornerShape(22.dp))
             .background(Color(0xF013131F))
-            .padding(20.dp),
+            .padding(22.dp),
     ) {
         Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
 
-        if (options.isEmpty() && offLabel == null) {
-            Text(emptyLabel, color = Muted, fontSize = 15.sp)
+        if (options.isEmpty()) {
+            // Nothing to choose: say it, and keep a button so the cursor has somewhere to be.
+            Text(emptyLabel, color = Muted, fontSize = 16.sp)
+
+            Spacer(Modifier.height(16.dp))
+
+            ActionButton(text = closeLabel, onClick = onClose, focusRequester = first)
         } else {
             LazyColumn(
                 modifier = Modifier.heightIn(max = 300.dp),
@@ -558,14 +566,15 @@ private fun TrackPanel(
             ) {
                 if (offLabel != null) {
                     item {
-                        TrackRow(offLabel, offSelected, first, onOff)
+                        TrackRow(offLabel, offSelected, true, first, onOff)
                     }
                 }
 
                 itemsIndexed(options) { index, option ->
                     TrackRow(
-                        label = option.label,
+                        label = if (option.supported) option.label else option.label + "   \u2022   " + unsupportedLabel,
                         selected = option.selected,
+                        enabled = option.supported,
                         focusRequester = if (offLabel == null && index == 0) first else null,
                         onClick = { onPick(option) },
                     )
@@ -579,11 +588,12 @@ private fun TrackPanel(
 private fun TrackRow(
     label: String,
     selected: Boolean,
+    enabled: Boolean,
     focusRequester: FocusRequester?,
     onClick: () -> Unit,
 ) {
     FocusCard(
-        onClick = onClick,
+        onClick = { if (enabled) onClick() },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         focusedScale = 1.02f,
@@ -604,7 +614,7 @@ private fun TrackRow(
 
             Text(
                 label,
-                color = TextMain,
+                color = if (enabled) TextMain else Color(0xFF7A7A90),
                 fontSize = 16.sp,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,

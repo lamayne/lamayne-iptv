@@ -26,15 +26,20 @@ object Filmography {
         .callTimeout(40, TimeUnit.SECONDS)
         .build()
 
-    suspend fun fetch(name: String): List<Film> =
+    // actorFound is false when the site does not know this person as an actor.
+    data class Result(val actorFound: Boolean, val films: List<Film>)
+
+    suspend fun fetch(name: String, onActorFound: () -> Unit = {}): Result =
         withContext(Dispatchers.IO) {
             val clean = name.trim().replace('"', ' ')
 
-            if (clean.length !in 2..80) return@withContext emptyList()
+            if (clean.length !in 2..80) return@withContext Result(false, emptyList())
 
-            val id = findActorId(clean) ?: return@withContext emptyList()
+            val id = findActorId(clean) ?: return@withContext Result(false, emptyList())
 
-            queryFilms(id)
+            onActorFound()
+
+            Result(true, queryFilms(id))
         }
 
     private fun <T> get(url: okhttp3.HttpUrl, parse: (JsonReader) -> T): T {

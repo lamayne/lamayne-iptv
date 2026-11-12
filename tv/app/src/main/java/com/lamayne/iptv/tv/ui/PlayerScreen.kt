@@ -2,6 +2,7 @@ package com.lamayne.iptv.tv.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +57,8 @@ import androidx.media3.common.Tracks
 import androidx.media3.ui.PlayerView
 import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.data.Channel
+import com.lamayne.iptv.tv.R
+import com.lamayne.iptv.tv.data.EpgEntry
 import com.lamayne.iptv.tv.data.EpgInfo
 import kotlinx.coroutines.delay
 
@@ -213,34 +216,45 @@ fun LivePlayerScreen(
 
         if (overlay) {
             // ---- top: which channel
+            val label = channelLabel(channel.name)
+
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .fillMaxWidth()
                     .background(Brush.verticalGradient(listOf(Color(0xE6000000), Color.Transparent)))
-                    .padding(horizontal = 48.dp, vertical = 28.dp),
+                    .padding(horizontal = 48.dp, vertical = 26.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(width = 96.dp, height = 64.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x33FFFFFF)),
-                ) {
-                    ChannelLogo(channel, Modifier.fillMaxSize().padding(8.dp))
-                }
+                ChannelLogo(channel, Modifier.size(width = 100.dp, height = 66.dp).padding(4.dp))
 
-                Spacer(Modifier.width(18.dp))
+                Spacer(Modifier.width(16.dp))
 
                 Column {
-                    Text(
-                        displayName(channel.name),
-                        color = Color.White,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            label.name,
+                            color = Color.White,
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+
+                        if (label.quality.isNotEmpty()) {
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                label.quality,
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .background(Color(0x66FFFFFF), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
 
                     Spacer(Modifier.height(6.dp))
 
@@ -255,47 +269,37 @@ fun LivePlayerScreen(
                 }
             }
 
-            // ---- bottom: programme and controls
+            // ---- bottom: what is on now, what comes next, controls
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF2000000))))
-                    .padding(horizontal = 48.dp, vertical = 28.dp),
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF5000000))))
+                    .padding(horizontal = 48.dp, vertical = 26.dp),
             ) {
-                val now = epg?.now
+                val nowSeconds = System.currentTimeMillis() / 1000
 
-                if (now != null) {
-                    val nowSeconds = System.currentTimeMillis() / 1000
-
-                    Text(
-                        "${formatClock(now.start)} - ${formatClock(now.stop)}   ${now.title}",
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    GuideCard(
+                        label = stringResource(R.string.guide_now),
+                        highlighted = true,
+                        entry = epg?.now,
+                        nowSeconds = nowSeconds,
+                        emptyText = stringResource(R.string.guide_empty),
+                        modifier = Modifier.weight(1.5f),
                     )
 
-                    Spacer(Modifier.height(10.dp))
-
-                    ProgressLine(now.progress(nowSeconds), Modifier.fillMaxWidth())
-
-                    val next = epg?.next
-
-                    if (next != null) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            stringResource(R.string.live_next) + "  ${formatClock(next.start)}   ${next.title}",
-                            color = Color(0xFFB8B8CC),
-                            fontSize = 16.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-
-                    Spacer(Modifier.height(20.dp))
+                    GuideCard(
+                        label = stringResource(R.string.guide_next),
+                        highlighted = false,
+                        entry = epg?.next,
+                        nowSeconds = nowSeconds,
+                        emptyText = stringResource(R.string.guide_empty),
+                        modifier = Modifier.weight(1f),
+                    )
                 }
+
+                Spacer(Modifier.height(18.dp))
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(18.dp),
@@ -366,6 +370,69 @@ fun LivePlayerScreen(
                 Text(message, color = Danger, fontSize = 15.sp)
                 Spacer(Modifier.height(10.dp))
                 Text(stringResource(R.string.player_try_other), color = Muted, fontSize = 15.sp)
+            }
+        }
+    }
+}
+
+// "Now" or "Next": time range, title and, for the programme on air, a progress bar.
+@Composable
+private fun GuideCard(
+    label: String,
+    highlighted: Boolean,
+    entry: EpgEntry?,
+    nowSeconds: Long,
+    emptyText: String,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(20.dp)
+
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(Color(0x99101018))
+            .border(1.dp, if (highlighted) Color(0x668B5CF6) else Color(0x22FFFFFF), shape)
+            .padding(18.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label.uppercase(),
+                color = if (highlighted) AccentBright else Muted,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 3.sp,
+            )
+
+            if (entry != null) {
+                Spacer(Modifier.weight(1f))
+                Text("${formatClock(entry.start)} - ${formatClock(entry.stop)}", color = Muted, fontSize = 13.sp)
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        if (entry == null) {
+            Text(emptyText, color = Muted, fontSize = 16.sp)
+        } else {
+            Text(
+                entry.title,
+                color = Color.White,
+                fontSize = if (highlighted) 22.sp else 18.sp,
+                fontWeight = if (highlighted) FontWeight.Bold else FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            if (highlighted) {
+                Spacer(Modifier.height(10.dp))
+
+                ProgressLine(entry.progress(nowSeconds), Modifier.fillMaxWidth())
+
+                Spacer(Modifier.height(6.dp))
+
+                val minutes = ((entry.stop - nowSeconds) / 60).coerceAtLeast(0)
+
+                Text(stringResource(R.string.guide_left, minutes.toInt()), color = Muted, fontSize = 13.sp)
             }
         }
     }

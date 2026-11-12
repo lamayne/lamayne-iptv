@@ -13,8 +13,8 @@ android {
         // Android 5.0 is the oldest version Android TV ever shipped with.
         minSdk = 21
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
     }
 
     buildTypes {
@@ -55,6 +55,8 @@ tasks.matching { it.name == "preBuild" }.configureEach {
 }
 
 dependencies {
+    // QR code of the support link (most TVs have no browser)
+    implementation("com.google.zxing:core:3.5.3")
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
 
     implementation("androidx.activity:activity-compose:1.9.3")

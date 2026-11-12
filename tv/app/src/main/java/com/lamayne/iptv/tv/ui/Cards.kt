@@ -105,18 +105,31 @@ fun ActionButton(
 
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        color = TextMain,
-        fontSize = 18.sp,
-        fontWeight = FontWeight.SemiBold,
-        modifier = modifier,
-    )
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(width = 4.dp, height = 18.dp)
+                .background(Brush.verticalGradient(listOf(AccentBright, Accent)), RoundedCornerShape(2.dp)),
+        )
+
+        Spacer(Modifier.width(10.dp))
+
+        Text(
+            text,
+            color = TextMain,
+            fontSize = 19.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
 }
 
-// A picture that fills its box, or the initials on a coloured tile when there is none.
 @Composable
-fun PosterImage(url: String?, title: String, modifier: Modifier = Modifier) {
+fun PosterImage(
+    url: String?,
+    title: String,
+    modifier: Modifier = Modifier,
+    alignment: Alignment = Alignment.Center,
+) {
     var failed by remember(url) { mutableStateOf(false) }
 
     if (url != null && !failed) {
@@ -124,6 +137,7 @@ fun PosterImage(url: String?, title: String, modifier: Modifier = Modifier) {
             model = url,
             contentDescription = null,
             contentScale = ContentScale.Crop,
+            alignment = alignment,
             onError = { failed = true },
             modifier = modifier,
         )
@@ -142,7 +156,7 @@ fun PosterImage(url: String?, title: String, modifier: Modifier = Modifier) {
     }
 }
 
-// A movie or series poster with its title.
+// A movie or series poster: the title sits on the picture, on a soft gradient.
 @Composable
 fun PosterCard(
     title: String,
@@ -161,58 +175,64 @@ fun PosterCard(
         shape = RoundedCornerShape(14.dp),
         focusRequester = focusRequester,
         onFocused = onFocused,
-        focusedScale = 1.06f,
+        focusedScale = 1.07f,
     ) {
-        Column {
-            Box(modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
-                PosterImage(image, title, Modifier.fillMaxSize())
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
+            PosterImage(image, title, Modifier.fillMaxSize())
 
-                if (progress != null) {
-                    ProgressLine(
-                        progress,
-                        Modifier
-                            .align(Alignment.BottomStart)
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                    )
-                }
-
-                if (favorite) {
-                    Icon(
-                        Icons.Filled.Favorite,
-                        contentDescription = null,
-                        tint = Accent,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(18.dp),
-                    )
-                }
-
-                if (rating != null) {
-                    Text(
-                        "\u2605 $rating",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp)
-                            .background(Color(0xAA000000), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xEE07070D))))
+                    .padding(start = 8.dp, end = 8.dp, top = 22.dp, bottom = if (progress != null) 16.dp else 8.dp),
+            ) {
+                Text(
+                    title,
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 14.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
 
-            Text(
-                title,
-                color = TextMain,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            )
+            if (progress != null) {
+                ProgressLine(
+                    progress,
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                )
+            }
+
+            if (favorite) {
+                Icon(
+                    Icons.Filled.Favorite,
+                    contentDescription = null,
+                    tint = Accent,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(18.dp),
+                )
+            }
+
+            if (rating != null) {
+                Text(
+                    "\u2605 $rating",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .background(Color(0xAA000000), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
         }
     }
 }
@@ -272,18 +292,23 @@ fun WideCard(
     }
 }
 
-// A channel in a row of the home page: the logo straight on the card (no grey tile).
+// A channel in a row of the home page: the logo straight on the card, and under it
+// what is on now (the name is shown instead when the channel has no logo or no guide).
 @Composable
 fun ChannelTile(
     channel: Channel,
     modifier: Modifier = Modifier,
-    favorite: Boolean = false,
+    nowTitle: String? = null,
+    nowProgress: Float? = null,
     onClick: () -> Unit,
 ) {
+    val label = channelLabel(channel.name)
+    val line = nowTitle ?: label.name
+
     FocusCard(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         focusedScale = 1.06f,
     ) {
         Column {
@@ -293,30 +318,36 @@ fun ChannelTile(
                     .aspectRatio(16f / 10f),
                 contentAlignment = Alignment.Center,
             ) {
-                ChannelLogo(channel, Modifier.fillMaxSize().padding(12.dp))
+                ChannelLogo(channel, Modifier.fillMaxSize().padding(14.dp))
 
-                if (favorite) {
-                    Icon(
-                        Icons.Filled.Favorite,
-                        contentDescription = null,
-                        tint = Accent,
+                if (nowTitle != null) {
+                    Box(
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(5.dp)
-                            .size(14.dp),
-                    )
+                            .align(Alignment.TopStart)
+                            .padding(6.dp)
+                            .background(LiveRed, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.dp),
+                    ) {
+                        Text("LIVE", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    }
                 }
             }
 
             Text(
-                displayName(channel.name),
-                color = TextMain,
-                fontSize = 12.sp,
+                line,
+                color = if (nowTitle != null) TextMain else Muted,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = 10.dp, end = 10.dp),
             )
+
+            if (nowProgress != null) {
+                ProgressLine(nowProgress, Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 5.dp, bottom = 9.dp))
+            } else {
+                Spacer(Modifier.size(9.dp))
+            }
         }
     }
 }
