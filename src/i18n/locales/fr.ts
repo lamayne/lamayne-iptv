@@ -128,6 +128,10 @@ export const fr: Record<string, string> = {
   'backend.xtreamNoChannelList': 'Le serveur Xtream n\'a pas renvoyé une liste de chaînes.',
   'backend.xtreamTimeout': 'La connexion au serveur Xtream a dépassé le délai autorisé.',
   'backend.xtreamUrlInvalid': 'Adresse du serveur Xtream invalide.',
+    'backend.actorNameInvalid': 'Nom d\'acteur invalide.',
+  'backend.filmographyUnreachable': 'Impossible de contacter le service de filmographie.',
+  'backend.filmographyHttp': 'Le service de filmographie a répondu avec le statut HTTP {status}.',
+  'backend.filmographyUnexpected': 'Réponse inattendue du service de filmographie.',
   // boot
   'boot.connecting': 'Connexion à votre fournisseur…',
   'boot.loading': 'Chargement en cours…',
