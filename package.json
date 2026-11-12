@@ -1,7 +1,7 @@
 {
   "name": "lamayne-iptv",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A personal player for your IPTV sources (Xtream, M3U)",
   "license": "MIT",
   "type": "module",
