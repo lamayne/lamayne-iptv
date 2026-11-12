@@ -34,8 +34,6 @@ fun MainScreen(viewModel: MainViewModel) {
             Tab.LIVE -> LiveTab(viewModel)
             Tab.MOVIES -> MoviesTab(viewModel)
             Tab.SERIES -> SeriesTab(viewModel)
-            Tab.FAVORITES -> FavoritesTab(viewModel)
-            Tab.SEARCH -> SearchTab(viewModel)
             Tab.SETTINGS -> SettingsTab(viewModel)
         }
     }
@@ -49,8 +47,6 @@ private fun labelOf(tab: Tab): String =
             Tab.LIVE -> R.string.nav_live
             Tab.MOVIES -> R.string.nav_movies
             Tab.SERIES -> R.string.nav_series
-            Tab.FAVORITES -> R.string.nav_favorites
-            Tab.SEARCH -> R.string.nav_search
             Tab.SETTINGS -> R.string.nav_settings
         }
     )

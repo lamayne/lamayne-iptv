@@ -95,6 +95,8 @@ fun LamayneApp(viewModel: MainViewModel) {
 
             route is Route.ManageCategories -> ManageCategoriesScreen(viewModel, route.kind)
 
+            route is Route.Actor -> ActorScreen(viewModel, route.name)
+
             else -> MainScreen(viewModel)
         }
     }

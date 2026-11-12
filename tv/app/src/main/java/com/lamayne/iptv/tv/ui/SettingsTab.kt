@@ -109,7 +109,7 @@ fun SettingsTab(viewModel: MainViewModel) {
                             onClick = {
                                 if (language != code) {
                                     language = code
-                                    viewModel.settings.language = code
+                                    viewModel.setLanguage(code)
                                     // The screens are rebuilt in the new language.
                                     context.findActivity()?.recreate()
                                 }
@@ -117,6 +117,10 @@ fun SettingsTab(viewModel: MainViewModel) {
                         )
                     }
                 }
+
+                Spacer(Modifier.height(10.dp))
+
+                Text(stringResource(R.string.settings_language_hint), color = Muted, fontSize = 14.sp)
             }
         }
 
@@ -180,13 +184,6 @@ fun SettingsTab(viewModel: MainViewModel) {
                         text = stringResource(R.string.settings_clear_history),
                         onClick = {
                             viewModel.clearProgress()
-                            message = cleared
-                        },
-                    )
-                    ActionButton(
-                        text = stringResource(R.string.settings_clear_recent),
-                        onClick = {
-                            viewModel.clearRecents()
                             message = cleared
                         },
                     )

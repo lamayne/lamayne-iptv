@@ -12,6 +12,7 @@ import com.lamayne.iptv.tv.data.Episode
 import com.lamayne.iptv.tv.data.EpgEntry
 import com.lamayne.iptv.tv.data.EpgInfo
 import com.lamayne.iptv.tv.data.Featured
+import com.lamayne.iptv.tv.data.Filmography
 import com.lamayne.iptv.tv.data.JsonListStore
 import com.lamayne.iptv.tv.data.Loadable
 import com.lamayne.iptv.tv.data.MediaInfo
@@ -42,13 +43,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.text.Normalizer
 import java.util.Locale
+import kotlin.math.abs
 
-enum class Tab { HOME, LIVE, MOVIES, SERIES, FAVORITES, SEARCH, SETTINGS }
+enum class Tab { HOME, LIVE, MOVIES, SERIES, SETTINGS }
 
 // Screens opened on top of the tabs. Back closes the last one.
 sealed interface Route {
@@ -56,6 +60,7 @@ sealed interface Route {
     data class SeriesDetails(val series: Series) : Route
     data class PlayVod(val request: VodRequest) : Route
     data class ManageCategories(val kind: MediaKind) : Route
+    data class Actor(val name: String) : Route
 }
 
 private val ACCENT_MARKS = Regex("\\p{M}+")
@@ -72,6 +77,8 @@ class SearchIndex<T : Any>(private val nameOf: (T) -> String) {
 
     val size: Int
         get() = data.first.size
+
+    fun items(): List<T> = data.first
 
     fun set(list: List<T>) {
         data = Pair(list, list.map { normalizeText(nameOf(it)) })
@@ -102,14 +109,30 @@ private val LATEST_WORDS = listOf(
     "nouveaut", "recemment", "recent", "latest", "new", "ajout", "novedad", "ultimos", "estreno",
 )
 
-private fun pickLatest(categories: List<Category>, hidden: Set<String>): Category? {
-    val visible = categories.filter { it.id !in hidden }
+// Providers tag their categories with a country: "|FR| NOUVEAUTES", "EN| MOVIES"...
+private val CATEGORY_TAG = Regex("^\\s*[|\\[(]?\\s*([A-Za-z]{2,3})\\s*[|\\])]")
 
-    return visible.firstOrNull { category ->
+private fun categoryTag(name: String): String? =
+    CATEGORY_TAG.find(name)?.groupValues?.get(1)?.uppercase(Locale.ROOT)
+
+// The country tags that go with a language of the app.
+private fun tagsFor(language: String): Set<String> =
+    when (language) {
+        "fr" -> setOf("FR", "FRA")
+        "es" -> setOf("ES", "SP", "ESP", "LAT")
+        else -> setOf("EN", "US", "UK", "GB", "ENG", "USA")
+    }
+
+private fun pickLatest(categories: List<Category>, hidden: Set<String>, tags: Set<String>): Category? {
+    val visible = categories.filter { it.id !in hidden }
+    val inLanguage = visible.filter { categoryTag(it.name) in tags }
+    val pool = if (inLanguage.isNotEmpty()) inLanguage else visible
+
+    return pool.firstOrNull { category ->
         val name = normalizeText(category.name)
 
         LATEST_WORDS.any { name.contains(it) }
-    } ?: visible.firstOrNull()
+    } ?: pool.firstOrNull()
 }
 
 private fun metaOf(info: MediaInfo, fallbackRating: String?): String {
@@ -132,7 +155,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val favChannelStore = JsonListStore(application, "fav_", 500, ::channelToJson, ::channelFromJson)
     private val favMovieStore = JsonListStore(application, "favm_", 500, ::movieToJson, ::movieFromJson)
     private val favSeriesStore = JsonListStore(application, "favs_", 500, ::seriesToJson, ::seriesFromJson)
-    private val recentStore = JsonListStore(application, "recent_", 24, ::channelToJson, ::channelFromJson)
     private val progressStore = JsonListStore(application, "progress_", 150, ::progressToJson, ::progressFromJson)
 
     // ------------------------------------------------------------------ account
@@ -179,6 +201,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         { c -> XtreamClient.movieCategories(c) },
         { c, id -> XtreamClient.movies(c, id) },
         { _hiddenMovies.value },
+        { list -> inContentLanguageFirst(list) },
     )
 
     val series = BrowseController<Series>(
@@ -186,6 +209,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         { c -> XtreamClient.seriesCategories(c) },
         { c, id -> XtreamClient.series(c, id) },
         { _hiddenSeries.value },
+        { list -> inContentLanguageFirst(list) },
     )
 
     // ------------------------------------------------------------------ favourites, history
@@ -198,9 +222,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _favSeries = MutableStateFlow<List<Series>>(emptyList())
     val favSeries: StateFlow<List<Series>> = _favSeries.asStateFlow()
-
-    private val _recents = MutableStateFlow<List<Channel>>(emptyList())
-    val recents: StateFlow<List<Channel>> = _recents.asStateFlow()
 
     private val _progress = MutableStateFlow<List<WatchProgress>>(emptyList())
     val progress: StateFlow<List<WatchProgress>> = _progress.asStateFlow()
@@ -243,6 +264,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _seriesInfo = MutableStateFlow<Loadable<SeriesInfo>>(Loadable.Loading)
     val seriesInfo: StateFlow<Loadable<SeriesInfo>> = _seriesInfo.asStateFlow()
 
+    // Movies of an actor (found on the filmography site, matched to the catalogue)
+    private val _actorMovies = MutableStateFlow<Loadable<List<Movie>>>(Loadable.Loading)
+    val actorMovies: StateFlow<Loadable<List<Movie>>> = _actorMovies.asStateFlow()
+
     // ------------------------------------------------------------------ search
 
     private val _searchQuery = MutableStateFlow("")
@@ -264,12 +289,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val movieIndex = SearchIndex<Movie> { it.name }
     private val seriesIndex = SearchIndex<Series> { it.name }
 
+    private val indexLoaded = HashSet<MediaKind>()
+    private val indexLocks = mapOf(
+        MediaKind.LIVE to Mutex(),
+        MediaKind.MOVIE to Mutex(),
+        MediaKind.SERIES to Mutex(),
+    )
+    private var movieTitleMap: Map<String, List<Pair<Movie, Int?>>>? = null
+    private val filmographyCache = HashMap<String, List<Filmography.Film>>()
+
     private var homeJob: Job? = null
     private var playingEpgJob: Job? = null
     private var searchJob: Job? = null
-    private var searchLoadJob: Job? = null
     private var infoJob: Job? = null
-    private var searchLoaded = false
+    private var actorJob: Job? = null
 
     // The list the current live channel was started from: up/down zap inside it.
     private var queue: List<Channel> = emptyList()
@@ -327,8 +360,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         homeJob?.cancel()
         playingEpgJob?.cancel()
         searchJob?.cancel()
-        searchLoadJob?.cancel()
         infoJob?.cancel()
+        actorJob?.cancel()
         credentialStore.clear()
         _credentials.value = null
         live.reset()
@@ -337,7 +370,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _favChannels.value = emptyList()
         _favMovies.value = emptyList()
         _favSeries.value = emptyList()
-        _recents.value = emptyList()
         _progress.value = emptyList()
         _featured.value = emptyList()
         _latestMovies.value = emptyList()
@@ -355,7 +387,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         channelIndex.set(emptyList())
         movieIndex.set(emptyList())
         seriesIndex.set(emptyList())
-        searchLoaded = false
+        indexLoaded.clear()
+        movieTitleMap = null
+        filmographyCache.clear()
         epgCache.clear()
         seriesInfoCache.clear()
         queue = emptyList()
@@ -365,7 +399,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _favChannels.value = favChannelStore.load(credentials)
         _favMovies.value = favMovieStore.load(credentials)
         _favSeries.value = favSeriesStore.load(credentials)
-        _recents.value = recentStore.load(credentials)
         _progress.value = progressStore.load(credentials)
         _hiddenLive.value = settings.hidden(credentials, MediaKind.LIVE)
         _hiddenMovies.value = settings.hidden(credentials, MediaKind.MOVIE)
@@ -374,10 +407,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadHome(credentials)
     }
 
+    // ------------------------------------------------------------------ language
+
+    // The movies and series that are suggested follow the language of the app.
+    private fun contentLanguage(): String {
+        val chosen = settings.language
+
+        return if (chosen != "system") chosen else Locale.getDefault().language
+    }
+
+    private fun inContentLanguageFirst(categories: List<Category>): List<Category> {
+        val tags = tagsFor(contentLanguage())
+
+        return categories.sortedBy { if (categoryTag(it.name) in tags) 0 else 1 }
+    }
+
+    // Changing the language reloads what depends on it.
+    fun setLanguage(code: String) {
+        settings.language = code
+
+        val credentials = _credentials.value ?: return
+
+        movies.reset()
+        series.reset()
+        _featured.value = emptyList()
+        loadHome(credentials)
+    }
+
     // ------------------------------------------------------------------ tabs and screens
+
+    // What each of Live TV, Movies and Series shows (0 favourites, 1 search, 2 a category).
+    // It is kept when coming back from a movie page; choosing the tab again starts over
+    // with the favourites.
+    private val browseModes = HashMap<MediaKind, Int>()
+
+    fun browseMode(kind: MediaKind): Int? = browseModes[kind]
+
+    fun rememberBrowseMode(kind: MediaKind, mode: Int) {
+        browseModes[kind] = mode
+    }
 
     fun selectTab(tab: Tab) {
         val credentials = _credentials.value
+
+        when (tab) {
+            Tab.LIVE -> browseModes.remove(MediaKind.LIVE)
+            Tab.MOVIES -> browseModes.remove(MediaKind.MOVIE)
+            Tab.SERIES -> browseModes.remove(MediaKind.SERIES)
+            else -> Unit
+        }
+
         _tab.value = tab
 
         if (credentials == null) return
@@ -385,7 +464,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         when (tab) {
             Tab.MOVIES -> if (!movies.started) movies.start(credentials)
             Tab.SERIES -> if (!series.started) series.start(credentials)
-            Tab.SEARCH -> ensureSearchData()
             else -> Unit
         }
     }
@@ -586,21 +664,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         favSeriesStore.save(credentials, updated)
     }
 
-    private fun rememberRecent(channel: Channel) {
-        val credentials = _credentials.value ?: return
-        val updated = (listOf(channel) + _recents.value.filterNot { it.id == channel.id }).take(24)
-
-        _recents.value = updated
-        recentStore.save(credentials, updated)
-    }
-
-    fun clearRecents() {
-        val credentials = _credentials.value ?: return
-
-        _recents.value = emptyList()
-        recentStore.save(credentials, emptyList())
-    }
-
     fun clearProgress() {
         val credentials = _credentials.value ?: return
 
@@ -635,7 +698,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun startLive(channel: Channel) {
         _playing.value = channel
         _playingEpg.value = null
-        rememberRecent(channel)
         playingEpgJob?.cancel()
         playingEpgJob = viewModelScope.launch {
             while (isActive) {
@@ -744,8 +806,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         number = episode.number,
     )
 
-    // "Continue watching" on the home page: straight back into the picture.
-    fun resume(progress: WatchProgress) {
+    // "Continue watching" on the home page: back into the picture, where it stopped
+    // or from the start.
+    fun resume(progress: WatchProgress, fromStart: Boolean = false) {
         push(
             Route.PlayVod(
                 VodRequest(
@@ -755,7 +818,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     subtitle = progress.subtitle,
                     image = progress.image,
                     ext = progress.ext,
-                    startMs = if (progress.inProgress) progress.position else 0L,
+                    startMs = if (!fromStart && progress.inProgress) progress.position else 0L,
                     seriesId = progress.seriesId,
                     seriesName = progress.seriesName,
                     season = progress.season,
@@ -843,8 +906,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _homeError.value = null
 
             try {
-                val movieCategory = pickLatest(XtreamClient.movieCategories(credentials), _hiddenMovies.value)
-                val seriesCategory = pickLatest(XtreamClient.seriesCategories(credentials), _hiddenSeries.value)
+                val tags = tagsFor(contentLanguage())
+                val movieCategory = pickLatest(XtreamClient.movieCategories(credentials), _hiddenMovies.value, tags)
+                val seriesCategory = pickLatest(XtreamClient.seriesCategories(credentials), _hiddenSeries.value, tags)
 
                 val latestMovies = movieCategory
                     ?.let { XtreamClient.movies(credentials, it.id).sortedByDescending { m -> m.added }.take(24) }
@@ -934,60 +998,70 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ------------------------------------------------------------------ search
 
-    fun setSearchQuery(text: String) {
+    // The search opens inside Live TV, Movies or Series and only looks in that one.
+    fun beginSearch(kind: MediaKind) {
+        _searchQuery.value = ""
+        _searchChannels.value = emptyList()
+        _searchMovies.value = emptyList()
+        _searchSeries.value = emptyList()
+        viewModelScope.launch {
+            try {
+                ensureIndex(kind)
+                runSearch(kind, _searchQuery.value)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // the search stays empty
+            }
+        }
+    }
+
+    fun setSearchQuery(kind: MediaKind, text: String) {
         _searchQuery.value = text
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             delay(250)
-            runSearch(text)
+            runSearch(kind, text)
         }
     }
 
-    // The lists are downloaded once, the first time Search is opened: channels,
-    // then series, then movies (the biggest).
-    private fun ensureSearchData() {
+    // The list of one type is downloaded once (the movies are the biggest).
+    private suspend fun ensureIndex(kind: MediaKind) {
         val credentials = _credentials.value ?: return
+        val lock = indexLocks.getValue(kind)
 
-        if (searchLoaded || searchLoadJob?.isActive == true) return
+        lock.withLock {
+            if (kind in indexLoaded) return
 
-        searchLoadJob = viewModelScope.launch {
-            for (kind in listOf(MediaKind.LIVE, MediaKind.SERIES, MediaKind.MOVIE)) {
-                _searchLoading.value = _searchLoading.value + kind
+            _searchLoading.value = _searchLoading.value + kind
 
-                try {
-                    when (kind) {
-                        MediaKind.LIVE -> {
-                            val list = XtreamClient.allLiveChannels(credentials)
+            try {
+                when (kind) {
+                    MediaKind.LIVE -> {
+                        val list = XtreamClient.allLiveChannels(credentials)
 
-                            withContext(Dispatchers.Default) { channelIndex.set(list) }
-                        }
-                        MediaKind.SERIES -> {
-                            val list = XtreamClient.allSeries(credentials)
-
-                            withContext(Dispatchers.Default) { seriesIndex.set(list) }
-                        }
-                        else -> {
-                            val list = XtreamClient.allMovies(credentials)
-
-                            withContext(Dispatchers.Default) { movieIndex.set(list) }
-                        }
+                        withContext(Dispatchers.Default) { channelIndex.set(list) }
                     }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // this kind stays empty
-                } finally {
-                    _searchLoading.value = _searchLoading.value - kind
+                    MediaKind.SERIES -> {
+                        val list = XtreamClient.allSeries(credentials)
+
+                        withContext(Dispatchers.Default) { seriesIndex.set(list) }
+                    }
+                    else -> {
+                        val list = XtreamClient.allMovies(credentials)
+
+                        withContext(Dispatchers.Default) { movieIndex.set(list) }
+                    }
                 }
 
-                runSearch(_searchQuery.value)
+                indexLoaded.add(kind)
+            } finally {
+                _searchLoading.value = _searchLoading.value - kind
             }
-
-            searchLoaded = true
         }
     }
 
-    private suspend fun runSearch(text: String) {
+    private suspend fun runSearch(kind: MediaKind, text: String) {
         val query = normalizeText(text).trim()
 
         if (query.length < 2) {
@@ -997,12 +1071,66 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        val channels = withContext(Dispatchers.Default) { channelIndex.search(query, 60) }
-        val movies = withContext(Dispatchers.Default) { movieIndex.search(query, 60) }
-        val series = withContext(Dispatchers.Default) { seriesIndex.search(query, 60) }
+        when (kind) {
+            MediaKind.LIVE -> {
+                _searchChannels.value = withContext(Dispatchers.Default) { channelIndex.search(query, 120) }
+            }
+            MediaKind.SERIES -> {
+                _searchSeries.value = withContext(Dispatchers.Default) { seriesIndex.search(query, 120) }
+            }
+            else -> {
+                _searchMovies.value = withContext(Dispatchers.Default) { movieIndex.search(query, 120) }
+            }
+        }
+    }
 
-        _searchChannels.value = channels
-        _searchMovies.value = movies
-        _searchSeries.value = series
+    // ------------------------------------------------------------------ actors
+
+    fun openActor(name: String) {
+        push(Route.Actor(name))
+        actorJob?.cancel()
+        _actorMovies.value = Loadable.Loading
+        actorJob = viewModelScope.launch {
+            try {
+                ensureIndex(MediaKind.MOVIE)
+
+                val films = filmographyCache[name] ?: Filmography.fetch(name).also { filmographyCache[name] = it }
+                val matches = withContext(Dispatchers.Default) { matchFilms(films) }
+
+                _actorMovies.value = Loadable.Ready(matches)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _actorMovies.value = Loadable.Failed(toUiError(e))
+            }
+        }
+    }
+
+    // The movies of the catalogue whose title is one of the actor's films
+    // (French, English or original title; the year, when both are known, within one).
+    private fun matchFilms(films: List<Filmography.Film>): List<Movie> {
+        val map = movieTitleMap ?: movieIndex.items()
+            .groupBy { Filmography.titleKey(it.name).first }
+            .mapValues { entry -> entry.value.map { movie -> movie to Filmography.titleKey(movie.name).second } }
+            .also { movieTitleMap = it }
+        val found = LinkedHashMap<String, Movie>()
+
+        for (film in films) {
+            for (title in film.titles) {
+                val key = Filmography.titleKey(title).first
+
+                if (key.length < 3) continue
+
+                for ((movie, year) in map[key].orEmpty()) {
+                    val filmYear = film.year
+
+                    if (filmYear != null && year != null && abs(filmYear - year) > 1) continue
+
+                    found[movie.id] = movie
+                }
+            }
+        }
+
+        return found.values.sortedBy { it.name }
     }
 }

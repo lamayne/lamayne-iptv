@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -108,6 +108,14 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
     val favorite = favorites.any { it.id == movie.id }
     val saved = progress.firstOrNull { it.kind == MediaKind.MOVIE && it.id == movie.id }
     val canResume = saved != null && saved.inProgress
+    val castNames = remember(info?.cast) {
+        info?.cast
+            ?.split(',', ';', '|')
+            ?.map { it.trim() }
+            ?.filter { it.length > 1 }
+            ?.take(14)
+            .orEmpty()
+    }
 
     BackHandler { viewModel.back() }
 
@@ -119,25 +127,25 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 56.dp, vertical = 40.dp),
+                .padding(horizontal = 56.dp, vertical = 36.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PosterImage(
                 info?.poster ?: movie.poster,
                 movie.name,
                 Modifier
-                    .width(240.dp)
+                    .width(210.dp)
                     .aspectRatio(2f / 3f)
                     .clip(RoundedCornerShape(16.dp)),
             )
 
-            Spacer(Modifier.width(36.dp))
+            Spacer(Modifier.width(32.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     displayName(movie.name),
                     color = Color.White,
-                    fontSize = 36.sp,
+                    fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -146,11 +154,11 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
                 val meta = metaLine(info, movie.rating)
 
                 if (meta.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(meta, color = Color(0xFFD0D0E0), fontSize = 16.sp, maxLines = 1)
+                    Spacer(Modifier.height(6.dp))
+                    Text(meta, color = Color(0xFFD0D0E0), fontSize = 15.sp, maxLines = 1)
                 }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(10.dp))
 
                 val plot = info?.plot
 
@@ -161,12 +169,12 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
                         else -> stringResource(R.string.details_no_plot)
                     },
                     color = Color(0xFFE0E0EC),
-                    fontSize = 16.sp,
-                    maxLines = 6,
+                    fontSize = 15.sp,
+                    maxLines = 5,
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                Spacer(Modifier.height(22.dp))
+                Spacer(Modifier.height(18.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ActionButton(
@@ -204,31 +212,40 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
                     )
                 }
 
-                val cast = info?.cast
                 val director = info?.director
 
-                if (director != null || cast != null) {
-                    Spacer(Modifier.height(20.dp))
+                if (director != null) {
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        stringResource(R.string.details_director, director),
+                        color = Muted,
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
 
-                    if (director != null) {
-                        Text(
-                            stringResource(R.string.details_director, director),
-                            color = Muted,
-                            fontSize = 14.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                // Each actor can be selected: it lists their movies in your catalogue.
+                if (castNames.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
 
-                    if (cast != null) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            stringResource(R.string.details_cast, cast),
-                            color = Muted,
-                            fontSize = 14.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                    Text(
+                        stringResource(R.string.details_cast_title),
+                        color = Muted,
+                        fontSize = 14.sp,
+                    )
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                    ) {
+                        items(castNames) { name ->
+                            Pill(
+                                text = name,
+                                selected = false,
+                                onClick = { viewModel.openActor(name) },
+                            )
+                        }
                     }
                 }
             }
@@ -259,6 +276,7 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
     }
     val episodes = seasons[season].orEmpty()
     val firstEpisodeFocus = remember { FocusRequester() }
+    var pending by remember { mutableStateOf<Episode?>(null) }
 
     BackHandler { viewModel.back() }
 
@@ -272,51 +290,32 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 56.dp, vertical = 36.dp),
+                .padding(horizontal = 56.dp, vertical = 32.dp),
         ) {
-            Column(modifier = Modifier.width(300.dp)) {
+            Column(modifier = Modifier.width(290.dp)) {
                 PosterImage(
                     info?.poster ?: series.poster,
                     series.name,
                     Modifier
-                        .width(200.dp)
+                        .width(130.dp)
                         .aspectRatio(2f / 3f)
-                        .clip(RoundedCornerShape(16.dp)),
+                        .clip(RoundedCornerShape(14.dp)),
                 )
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
 
                 Text(
                     displayName(series.name),
                     color = Color.White,
-                    fontSize = 26.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 3,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                val meta = metaLine(info, series.rating)
+                Spacer(Modifier.height(10.dp))
 
-                if (meta.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(meta, color = Color(0xFFD0D0E0), fontSize = 14.sp, maxLines = 2)
-                }
-
-                val plot = info?.plot
-
-                if (plot != null) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        plot,
-                        color = Color(0xFFE0E0EC),
-                        fontSize = 14.sp,
-                        maxLines = 6,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                Spacer(Modifier.height(16.dp))
-
+                // Right under the title, so it is always on screen.
                 ActionButton(
                     text = stringResource(
                         if (favorite) R.string.details_favorite_remove else R.string.details_favorite_add
@@ -324,9 +323,29 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
                     onClick = { viewModel.toggleFavorite(series) },
                     icon = { HeartIcon(favorite) },
                 )
+
+                val meta = metaLine(info, series.rating)
+
+                if (meta.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(meta, color = Color(0xFFD0D0E0), fontSize = 13.sp, maxLines = 2)
+                }
+
+                val plot = info?.plot
+
+                if (plot != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        plot,
+                        color = Color(0xFFE0E0EC),
+                        fontSize = 13.sp,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
 
-            Spacer(Modifier.width(36.dp))
+            Spacer(Modifier.width(32.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 when (val current = state) {
@@ -341,7 +360,7 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
                         if (seasonNumbers.isEmpty()) {
                             MessageBlock(stringResource(R.string.details_no_episodes), "")
                         } else {
-                            androidx.compose.foundation.lazy.LazyRow(
+                            LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 contentPadding = PaddingValues(bottom = 12.dp),
                             ) {
@@ -368,13 +387,15 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
                                         episode = episode,
                                         fraction = saved?.fraction,
                                         finished = saved?.finished == true,
-                                        modifier = if (episode.id == episodes.first().id) {
-                                            Modifier
-                                        } else {
-                                            Modifier
-                                        },
                                         focusRequester = if (episode.id == episodes.first().id) firstEpisodeFocus else null,
-                                        onClick = { viewModel.playEpisode(series, episode, resume = true) },
+                                        onClick = {
+                                            // Already started: ask whether to resume or start over.
+                                            if (saved != null && saved.inProgress) {
+                                                pending = episode
+                                            } else {
+                                                viewModel.playEpisode(series, episode, resume = false)
+                                            }
+                                        },
                                     )
                                 }
                             }
@@ -384,6 +405,24 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
             }
         }
     }
+
+    pending?.let { episode ->
+        val saved = progress.firstOrNull { it.kind == MediaKind.EPISODE && it.id == episode.id }
+
+        ResumeDialog(
+            title = episode.title,
+            positionMs = saved?.position ?: 0L,
+            onResume = {
+                pending = null
+                viewModel.playEpisode(series, episode, resume = true)
+            },
+            onRestart = {
+                pending = null
+                viewModel.playEpisode(series, episode, resume = false)
+            },
+            onDismiss = { pending = null },
+        )
+    }
 }
 
 @Composable
@@ -391,13 +430,12 @@ private fun EpisodeRow(
     episode: Episode,
     fraction: Float?,
     finished: Boolean,
-    modifier: Modifier,
     focusRequester: FocusRequester?,
     onClick: () -> Unit,
 ) {
     FocusCard(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         focusedScale = 1.02f,
         focusRequester = focusRequester,

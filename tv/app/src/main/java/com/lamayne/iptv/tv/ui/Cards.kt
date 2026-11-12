@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,12 +28,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.data.Channel
 
 // A tab or a filter: text only, filled when selected.
@@ -103,7 +108,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
         color = TextMain,
-        fontSize = 20.sp,
+        fontSize = 18.sp,
         fontWeight = FontWeight.SemiBold,
         modifier = modifier,
     )
@@ -267,7 +272,7 @@ fun WideCard(
     }
 }
 
-// A channel in a row of the home page: logo on a dark tile, name below.
+// A channel in a row of the home page: the logo straight on the card (no grey tile).
 @Composable
 fun ChannelTile(
     channel: Channel,
@@ -278,18 +283,17 @@ fun ChannelTile(
     FocusCard(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         focusedScale = 1.06f,
     ) {
         Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .background(LogoBg),
+                    .aspectRatio(16f / 10f),
                 contentAlignment = Alignment.Center,
             ) {
-                ChannelLogo(channel, Modifier.fillMaxSize().padding(14.dp))
+                ChannelLogo(channel, Modifier.fillMaxSize().padding(12.dp))
 
                 if (favorite) {
                     Icon(
@@ -298,8 +302,8 @@ fun ChannelTile(
                         tint = Accent,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(16.dp),
+                            .padding(5.dp)
+                            .size(14.dp),
                     )
                 }
             }
@@ -307,12 +311,68 @@ fun ChannelTile(
             Text(
                 displayName(channel.name),
                 color = TextMain,
-                fontSize = 14.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                modifier = Modifier.padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
             )
+        }
+    }
+}
+
+// "Resume at 34:10" or "Start over": asked before playing something already started.
+@Composable
+fun ResumeDialog(
+    title: String,
+    positionMs: Long,
+    onResume: () -> Unit,
+    onRestart: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val first = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(24.dp))
+                .background(Panel)
+                .padding(horizontal = 36.dp, vertical = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                stringResource(R.string.resume_title),
+                color = Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            Spacer(Modifier.size(6.dp))
+
+            Text(
+                title,
+                color = Muted,
+                fontSize = 15.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            Spacer(Modifier.size(22.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                ActionButton(
+                    text = stringResource(R.string.details_resume, formatDuration(positionMs)),
+                    onClick = onResume,
+                    primary = true,
+                    focusRequester = first,
+                )
+                ActionButton(
+                    text = stringResource(R.string.details_restart),
+                    onClick = onRestart,
+                )
+            }
         }
     }
 }
@@ -327,8 +387,8 @@ fun <T> ContentRow(
 ) {
     if (list.isEmpty()) return
 
-    Column(modifier = modifier) {
-        SectionTitle(title, Modifier.padding(start = 48.dp, bottom = 10.dp))
+    Column(modifier = modifier.padding(top = 10.dp)) {
+        SectionTitle(title, Modifier.padding(start = 48.dp, bottom = 6.dp))
 
         androidx.compose.foundation.lazy.LazyRow(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 48.dp, vertical = 8.dp),

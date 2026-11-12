@@ -4,11 +4,17 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// Providers prefix names with a country tag: "|FR| TF1" is shown as "TF1".
+// Providers prefix names with a country tag ("|FR| TF1") and add the quality
+// ("TF1 FHD", "FHD| TF1", "4K Tetris"): none of this belongs in the title.
 private val COUNTRY_PREFIX = Regex("^\\s*[|\\[(]?[A-Za-z]{2,3}[|\\])]\\s*[:\\-]?\\s*")
+private const val QUALITY_WORDS = "FHD|UHD|HD|SD|4K|8K|HEVC|H265|H264|RAW|50FPS|60FPS"
+private val QUALITY_START = Regex("(?i)^\\s*(?:(?:$QUALITY_WORDS)\\b\\s*[|:\\-]?\\s*)+")
+private val QUALITY_END = Regex("(?i)(?:\\s*[|:\\-]?\\s*\\b(?:$QUALITY_WORDS))+\\s*$")
 
 fun displayName(raw: String): String {
-    val cleaned = raw.replace(COUNTRY_PREFIX, "").trim()
+    var cleaned = raw.replace(COUNTRY_PREFIX, "")
+
+    cleaned = cleaned.replace(QUALITY_START, "").replace(QUALITY_END, "").trim()
 
     return if (cleaned.isEmpty()) raw.trim() else cleaned
 }

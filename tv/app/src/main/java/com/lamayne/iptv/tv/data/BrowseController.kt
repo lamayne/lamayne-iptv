@@ -15,6 +15,8 @@ class BrowseController<T : Any>(
     private val fetchCategories: suspend (Credentials) -> List<Category>,
     private val fetchItems: suspend (Credentials, String) -> List<T>,
     private val hidden: () -> Set<String>,
+    // Puts the categories in the order to show (e.g. the ones in the app language first).
+    private val order: (List<Category>) -> List<Category> = { it },
 ) {
     private val _categories = MutableStateFlow<List<Category>>(emptyList())
     val categories: StateFlow<List<Category>> = _categories.asStateFlow()
@@ -44,7 +46,7 @@ class BrowseController<T : Any>(
             _error.value = null
 
             try {
-                val list = fetchCategories(credentials)
+                val list = order(fetchCategories(credentials))
 
                 _categories.value = list
 

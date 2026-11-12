@@ -11,9 +11,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -34,11 +38,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
@@ -61,8 +68,11 @@ import kotlinx.coroutines.delay
 
 // Plays a movie or an episode. Remote control:
 //  - left / right jump 10 seconds back or forward (the controls need not be shown);
-//  - any other key shows the controls: -10 s, play/pause, +10 s, next episode, favourite;
-//  - Back hides the controls, then leaves the player. Where you stopped is remembered.
+//  - any other key shows the controls; up reaches the position bar, where left / right
+//    move to any place in the movie; below it: -10 s, play/pause, +10 s, next
+//    episode, audio, subtitles, favourite;
+//  - Back closes the audio / subtitles list, then hides the controls, then leaves
+//    the player. Where you stopped is remembered.
 @Composable
 fun VodPlayerScreen(
     request: VodRequest,
@@ -82,10 +92,15 @@ fun VodPlayerScreen(
     var touch by remember { mutableLongStateOf(0L) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
+    var tracks by remember { mutableStateOf<Tracks?>(null) }
+    // 0 = nothing, 1 = audio tracks, 2 = subtitles
+    var picker by remember { mutableStateOf(0) }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
     val exoPlayer = remember { createPlayer(context) }
     val isEpisode = request.kind == MediaKind.EPISODE
+    val audioOptions = remember(tracks) { trackOptions(tracks, C.TRACK_TYPE_AUDIO) }
+    val textOptions = remember(tracks) { trackOptions(tracks, C.TRACK_TYPE_TEXT) }
 
     fun reveal() {
         overlay = true
@@ -106,14 +121,20 @@ fun VodPlayerScreen(
         if (overlay) overlay = false else onBack()
     }
 
+    // Declared after the one above: it is the first to answer Back.
+    BackHandler(enabled = picker != 0) {
+        picker = 0
+    }
+
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 failure = "${error.errorCodeName}: ${error.message ?: ""}"
             }
 
-            override fun onTracksChanged(tracks: Tracks) {
-                info = describeTracks(tracks)
+            override fun onTracksChanged(newTracks: Tracks) {
+                tracks = newTracks
+                info = describeTracks(newTracks)
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -173,8 +194,9 @@ fun VodPlayerScreen(
         }
     }
 
-    LaunchedEffect(overlay, touch, paused) {
-        if (overlay && !paused) {
+    // The controls stay while the picture is paused or a list is open.
+    LaunchedEffect(overlay, touch, paused, picker) {
+        if (overlay && !paused && picker == 0) {
             delay(6_000)
             overlay = false
         }
@@ -192,6 +214,9 @@ fun VodPlayerScreen(
             .background(Color.Black)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+
+                // While an audio / subtitles list is open, the keys move inside it.
+                if (picker != 0) return@onPreviewKeyEvent false
 
                 when (event.key) {
                     Key.Back -> false
@@ -286,21 +311,16 @@ fun VodPlayerScreen(
                 }
             }
 
-            // ---- bottom: progress and controls
+            // ---- bottom: position bar and controls
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF2000000))))
-                    .padding(horizontal = 48.dp, vertical = 28.dp),
+                    .padding(horizontal = 48.dp, vertical = 24.dp),
             ) {
                 if (duration > 0) {
-                    ProgressLine(
-                        (position.toFloat() / duration).coerceIn(0f, 1f),
-                        Modifier.fillMaxWidth(),
-                    )
-
-                    Spacer(Modifier.height(8.dp))
+                    SeekBar(position, duration, onSeekBy = { seekBy(it) })
 
                     Row(modifier = Modifier.fillMaxWidth()) {
                         Text(formatDuration(position), color = Color.White, fontSize = 15.sp)
@@ -312,11 +332,11 @@ fun VodPlayerScreen(
                         )
                     }
 
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(12.dp))
                 }
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RoundButton(onClick = { seekBy(-10_000) }) {
@@ -351,6 +371,18 @@ fun VodPlayerScreen(
                         }
                     }
 
+                    if (audioOptions.size > 1) {
+                        ActionButton(
+                            text = stringResource(R.string.player_audio),
+                            onClick = { picker = 1 },
+                        )
+                    }
+
+                    ActionButton(
+                        text = stringResource(R.string.player_subtitles),
+                        onClick = { picker = 2 },
+                    )
+
                     RoundButton(onClick = { onToggleFavorite() }) {
                         Icon(
                             if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
@@ -359,16 +391,40 @@ fun VodPlayerScreen(
                             modifier = Modifier.size(30.dp),
                         )
                     }
-
-                    Spacer(Modifier.weight(1f))
-
-                    Text(
-                        stringResource(R.string.player_hint_vod),
-                        color = Color(0xFFB8B8CC),
-                        fontSize = 14.sp,
-                    )
                 }
+
+                Spacer(Modifier.height(8.dp))
+
+                Text(
+                    stringResource(R.string.player_hint_vod),
+                    color = Color(0xFFB8B8CC),
+                    fontSize = 13.sp,
+                )
             }
+        }
+
+        // ---- audio / subtitles list
+        if (picker != 0) {
+            val isAudio = picker == 1
+
+            TrackPanel(
+                title = stringResource(if (isAudio) R.string.player_audio else R.string.player_subtitles),
+                options = if (isAudio) audioOptions else textOptions,
+                offLabel = if (isAudio) null else stringResource(R.string.player_off),
+                offSelected = !isAudio && textOptions.none { it.selected },
+                emptyLabel = stringResource(R.string.player_no_tracks),
+                onOff = {
+                    disableSubtitles(exoPlayer)
+                    picker = 0
+                    reveal()
+                },
+                onPick = { option ->
+                    selectTrack(exoPlayer, option)
+                    picker = 0
+                    reveal()
+                },
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
         }
 
         failure?.let { message ->
@@ -391,6 +447,169 @@ fun VodPlayerScreen(
                 Spacer(Modifier.height(10.dp))
                 Text(stringResource(R.string.player_back_hint), color = Muted, fontSize = 15.sp)
             }
+        }
+    }
+}
+
+// The position bar. When the cursor is on it, left / right move to any place in the
+// movie (10 seconds a press, faster when the key is held).
+@Composable
+private fun SeekBar(position: Long, duration: Long, onSeekBy: (Long) -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val fraction = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(30.dp)
+            .onFocusChanged { focused = it.isFocused }
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+
+                val repeats = event.nativeKeyEvent.repeatCount
+                val step = when {
+                    repeats > 15 -> 60_000L
+                    repeats > 5 -> 30_000L
+                    else -> 10_000L
+                }
+
+                when (event.key) {
+                    Key.DirectionLeft -> {
+                        onSeekBy(-step)
+                        true
+                    }
+                    Key.DirectionRight -> {
+                        onSeekBy(step)
+                        true
+                    }
+                    else -> false
+                }
+            }
+            .focusable(),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        val trackHeight = if (focused) 10.dp else 5.dp
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(trackHeight)
+                .clip(RoundedCornerShape(5.dp))
+                .background(Color(0x40FFFFFF)),
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraction)
+                .height(trackHeight)
+                .clip(RoundedCornerShape(5.dp))
+                .background(Accent),
+        )
+
+        if (focused) {
+            Box(
+                modifier = Modifier.fillMaxWidth(fraction),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(Color.White),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackPanel(
+    title: String,
+    options: List<TrackOption>,
+    offLabel: String?,
+    offSelected: Boolean,
+    emptyLabel: String,
+    onOff: () -> Unit,
+    onPick: (TrackOption) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val first = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+
+    Column(
+        modifier = modifier
+            .padding(32.dp)
+            .width(400.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xF013131F))
+            .padding(20.dp),
+    ) {
+        Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+
+        Spacer(Modifier.height(12.dp))
+
+        if (options.isEmpty() && offLabel == null) {
+            Text(emptyLabel, color = Muted, fontSize = 15.sp)
+        } else {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 300.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (offLabel != null) {
+                    item {
+                        TrackRow(offLabel, offSelected, first, onOff)
+                    }
+                }
+
+                itemsIndexed(options) { index, option ->
+                    TrackRow(
+                        label = option.label,
+                        selected = option.selected,
+                        focusRequester = if (offLabel == null && index == 0) first else null,
+                        onClick = { onPick(option) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackRow(
+    label: String,
+    selected: Boolean,
+    focusRequester: FocusRequester?,
+    onClick: () -> Unit,
+) {
+    FocusCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        focusedScale = 1.02f,
+        focusRequester = focusRequester,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) Accent else Color(0x33FFFFFF)),
+            )
+
+            Spacer(Modifier.width(14.dp))
+
+            Text(
+                label,
+                color = TextMain,
+                fontSize = 16.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

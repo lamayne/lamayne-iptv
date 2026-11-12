@@ -2,14 +2,17 @@ package com.lamayne.iptv.tv.ui
 
 import android.content.Context
 import androidx.media3.common.C
+import androidx.media3.common.Format
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import java.util.Locale
 
 fun createPlayer(context: Context): ExoPlayer {
     val dataSource = DefaultHttpDataSource.Factory()
-        .setUserAgent("LAMAYNE-TV/0.2")
+        .setUserAgent("LAMAYNE-TV/0.4")
         .setAllowCrossProtocolRedirects(true)
         .setConnectTimeoutMs(15_000)
         .setReadTimeoutMs(25_000)
@@ -47,4 +50,72 @@ fun describeTracks(tracks: Tracks): String {
     }
 
     return parts.joinToString("   |   ")
+}
+
+// One audio or subtitle track the viewer can choose.
+data class TrackOption(
+    val group: Tracks.Group,
+    val index: Int,
+    val label: String,
+    val selected: Boolean,
+)
+
+private fun trackLabel(format: Format, number: Int, isAudio: Boolean): String {
+    val language = format.language
+        ?.takeIf { it.isNotBlank() && it != "und" }
+        ?.let { code ->
+            Locale(code).getDisplayLanguage(Locale.getDefault())
+                .replaceFirstChar { char -> char.uppercase() }
+        }
+    val name = format.label?.takeIf { it.isNotBlank() }
+    val codec = if (isAudio) {
+        (format.sampleMimeType ?: "").substringAfter('/').uppercase().takeIf { it.isNotBlank() }
+    } else {
+        null
+    }
+    val channels = if (isAudio && format.channelCount > 0) "${format.channelCount}ch" else null
+
+    return listOfNotNull(language ?: name ?: "#$number", codec, channels).joinToString("   \u2022   ")
+}
+
+// The audio tracks (type = C.TRACK_TYPE_AUDIO) or subtitles (C.TRACK_TYPE_TEXT) of
+// the picture being played.
+fun trackOptions(tracks: Tracks?, type: Int): List<TrackOption> {
+    if (tracks == null) return emptyList()
+
+    val options = ArrayList<TrackOption>()
+
+    for (group in tracks.groups) {
+        if (group.type != type) continue
+
+        for (index in 0 until group.length) {
+            if (!group.isTrackSupported(index)) continue
+
+            options.add(
+                TrackOption(
+                    group = group,
+                    index = index,
+                    label = trackLabel(group.getTrackFormat(index), options.size + 1, type == C.TRACK_TYPE_AUDIO),
+                    selected = group.isTrackSelected(index),
+                )
+            )
+        }
+    }
+
+    return options
+}
+
+fun selectTrack(player: ExoPlayer, option: TrackOption) {
+    player.trackSelectionParameters = player.trackSelectionParameters
+        .buildUpon()
+        .setTrackTypeDisabled(option.group.type, false)
+        .setOverrideForType(TrackSelectionOverride(option.group.mediaTrackGroup, option.index))
+        .build()
+}
+
+fun disableSubtitles(player: ExoPlayer) {
+    player.trackSelectionParameters = player.trackSelectionParameters
+        .buildUpon()
+        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        .build()
 }
