@@ -78,12 +78,14 @@ jobs:
       - name: Standard installer
         run: pnpm tauri build --bundles nsis
 
+      # "installers" is NOT "dist": Vite empties dist at every build, which would
+      # delete the standard installer when the offline one is built.
       - name: Collect the standard installer
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          New-Item -ItemType Directory -Path installers -Force | Out-Null
           $file = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
-          Copy-Item $file.FullName "dist/LAMAYNE-IPTV_${{ steps.meta.outputs.version }}_x64-setup.exe"
+          Copy-Item $file.FullName "installers/LAMAYNE-IPTV_${{ steps.meta.outputs.version }}_x64-setup.exe"
 
       # Microsoft Store version: WebView2 is included (bigger installer).
       - name: Offline installer (Microsoft Store)
@@ -93,14 +95,22 @@ jobs:
         shell: pwsh
         run: |
           $file = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1
-          Copy-Item $file.FullName "dist/LAMAYNE-IPTV_${{ steps.meta.outputs.version }}_x64-setup-offline.exe"
+          Copy-Item $file.FullName "installers/LAMAYNE-IPTV_${{ steps.meta.outputs.version }}_x64-setup-offline.exe"
+
+      - name: Check both installers
+        shell: pwsh
+        run: |
+          Get-ChildItem installers | Format-Table Name, Length
+          if ((Get-ChildItem installers/*.exe).Count -ne 2) {
+            throw "Expected 2 installers in installers/, found $((Get-ChildItem installers/*.exe).Count)."
+          }
 
       - id: upload
         name: Upload the unsigned installers
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-installers
-          path: dist/*.exe
+          path: installers/*.exe
           if-no-files-found: error
 
   sign:
