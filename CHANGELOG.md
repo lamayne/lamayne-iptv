@@ -2,6 +2,11 @@
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.1.1]
+
+### Added
+- **Actor filmography**: clicking an actor's name on a movie page now lists all of their movies available in your catalog, not only the ones whose page you already opened. The filmography comes from Wikidata; only the actor's name is sent, and only when you click it.
+
 ## [0.1.0] — first public release
 
 ### Added
