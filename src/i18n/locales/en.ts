@@ -128,6 +128,10 @@ export const en: Record<string, string> = {
   'backend.xtreamNoChannelList': 'The Xtream server did not return a channel list.',
   'backend.xtreamTimeout': 'The connection to the Xtream server timed out.',
   'backend.xtreamUrlInvalid': 'Invalid Xtream server address.',
+    'backend.actorNameInvalid': 'Invalid actor name.',
+  'backend.filmographyUnreachable': 'Unable to reach the filmography service.',
+  'backend.filmographyHttp': 'The filmography service replied with HTTP status {status}.',
+  'backend.filmographyUnexpected': 'Unexpected response from the filmography service.',
   // boot
   'boot.connecting': 'Connecting to your provider…',
   'boot.loading': 'Loading…',
