@@ -28,7 +28,8 @@ The application only contacts:
 4. **Google devices on your local network**, if you use "Cast": the application discovers them on the local network, then
    sends them the **stream address, which contains your IPTV credentials**. Only use this feature on a network you trust.
 5. **Your browser**, when you click a link (Buy Me a Coffee, bug reports): the site that opens applies its own policy.
-
+6. **Wikidata** (`www.wikidata.org`, `query.wikidata.org`), only when you click an actor's name on a movie page: the actor's name is sent to find their filmography,
+   so the app can show which of their movies are in your catalog. Nothing else is sent (no credentials, no viewing history).
 No other data is sent to the author of the application or to any third party.
 
 ## Your rights
