@@ -154,6 +154,10 @@ jobs:
       - name: Checksums
         run: |
           cd release
+          ls -la
+          # The offline installer (Microsoft Store) is not published with the release.
+          rm -f ./*-offline.exe
+          test -f "LAMAYNE-IPTV_${{ needs.build.outputs.version }}_x64-setup.exe" || { echo "Standard installer is missing"; exit 1; }
           sha256sum *.exe > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
@@ -164,7 +168,3 @@ jobs:
           files: |
             release/*.exe
             release/SHA256SUMS.txt
-
-      - name: Summary
-        run: |
-          if [ "${{ needs.sign.result }}"
