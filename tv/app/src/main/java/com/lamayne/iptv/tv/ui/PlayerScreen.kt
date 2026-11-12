@@ -57,7 +57,6 @@ import androidx.media3.common.Tracks
 import androidx.media3.ui.PlayerView
 import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.data.Channel
-import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.data.EpgEntry
 import com.lamayne.iptv.tv.data.EpgInfo
 import kotlinx.coroutines.delay
