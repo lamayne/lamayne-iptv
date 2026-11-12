@@ -328,6 +328,9 @@ export const fr: Record<string, string> = {
   'movie.pas_encore_de_recommandation_pertinente_': 'Pas encore de recommandation pertinente dans vos catégories visibles.',
   'movie.progression_du_film': 'Progression du film',
   'movie.uniquement_des_films_de_votre_source': 'Uniquement des films de votre source et de vos catégories visibles. La sélection s’enrichit avec les fiches consultées.',
+    'movie.actor_loading': 'Recherche de la filmographie…',
+  'movie.actor_source': 'Filmographie : Wikidata. Seuls les titres présents dans votre catalogue sont affichés.',
+  'movie.actor_error': 'Filmographie indisponible : seuls les films déjà consultés sont affichés.',
   // movies
   'movies.addFavorite': 'Ajouter',
   'movies.allCategories': 'Toutes les catégories',
