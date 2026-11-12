@@ -13,8 +13,8 @@ android {
         // Android 5.0 is the oldest version Android TV ever shipped with.
         minSdk = 21
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.0.1"
+        versionCode = 2
+        versionName = "0.0.2"
     }
 
     buildTypes {
@@ -42,6 +42,18 @@ android {
     }
 }
 
+// The app emblem lives in the repository (public/brand). It is copied into the
+// Android resources at build time; the app draws a substitute if it is missing.
+val copyBrand by tasks.registering(Copy::class) {
+    from(rootProject.file("../public/brand/lamayne-emblem.png"))
+    into(layout.projectDirectory.dir("src/main/res/drawable-nodpi"))
+    rename { "lamayne_emblem.png" }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(copyBrand)
+}
+
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
 
@@ -52,6 +64,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.tv:tv-material:1.0.0")
 
     implementation("androidx.media3:media3-exoplayer:1.5.1")
