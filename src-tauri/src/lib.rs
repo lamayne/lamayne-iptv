@@ -6,6 +6,7 @@ use tauri::Manager;
 
 mod cast;
 mod epg_cache;
+mod filmography;
 
 const MAX_PLAYLIST_BYTES: usize = 20 * 1024 * 1024;
 const MAX_CATALOG_BYTES: usize = 50 * 1024 * 1024;
@@ -807,6 +808,7 @@ pub fn run() {
             epg_cache::fetch_public_epg,
             epg_cache::refresh_public_epg,
             epg_cache::epg_diagnose,
+            filmography::fetch_filmography,
             list_saved_xtream_sources,
             save_xtream_source,
             load_saved_xtream_source,
