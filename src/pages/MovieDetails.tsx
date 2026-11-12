@@ -38,6 +38,13 @@ import {
 import { errorText } from '@/i18n/backendErrors';
 import { backLabelFor } from '@/utils/backLabel';
 
+import {
+  buildTitleIndex,
+  loadFilmography,
+  matchFilmography,
+  type FilmographyEntry,
+} from '@/utils/filmography';
+
 type Recommendation = {
   movie: CatalogMovie;
   score: number;
@@ -359,6 +366,9 @@ export default function MovieDetails() {
     sameCategory: t('movie.dans_la_meme_categorie'),
     actorMovies: t('movie.films_disponibles_avec'),
     partial: t('movie.base_sur_les_fiches_deja_consultees'),
+    actorLoading: t('movie.actor_loading'),
+    actorSource: t('movie.actor_source'),
+    actorError: t('movie.actor_error'),
     noMatches: t('movie.aucun_autre_film_identifie_dans_vos'),
     close: t('common.close'),
     loading: t('settings.loading'),
@@ -685,6 +695,51 @@ export default function MovieDetails() {
     };
   }, [actor]);
 
+  // Filmographie de l'acteur (Wikidata), rapprochée du catalogue : tous les films
+  // disponibles, pas seulement ceux dont la fiche a déjà été ouverte.
+  const [filmography, setFilmography] = useState<{
+    actor: string;
+    status: 'idle' | 'loading' | 'ready' | 'error';
+    entries: FilmographyEntry[];
+  }>({ actor: '', status: 'idle', entries: [] });
+
+  useEffect(() => {
+    if (!actor) {
+      setFilmography({ actor: '', status: 'idle', entries: [] });
+
+      return;
+    }
+
+    let cancelled = false;
+
+    setFilmography({ actor, status: 'loading', entries: [] });
+
+    loadFilmography(actor)
+      .then((entries) => {
+        if (!cancelled) setFilmography({ actor, status: 'ready', entries });
+      })
+      .catch(() => {
+        if (!cancelled) setFilmography({ actor, status: 'error', entries: [] });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actor]);
+
+  const titleIndex = useMemo(
+    () => (actor ? buildTitleIndex(visibleMovies) : null),
+    [actor, visibleMovies]
+  );
+
+  const filmographyMovies = useMemo(
+    () =>
+      titleIndex && filmography.actor === actor
+        ? matchFilmography(filmography.entries, titleIndex)
+        : EMPTY_MOVIES,
+    [titleIndex, filmography, actor]
+  );
+
   const actorMovies =
     useMemo(() => {
       if (!actor) return [];
@@ -694,7 +749,7 @@ export default function MovieDetails() {
           actor
         );
 
-      return visibleMovies
+      const fromCache = visibleMovies
         .filter((movie) => {
           const metadata =
             index.get(movie.id);
@@ -708,15 +763,22 @@ export default function MovieDetails() {
             )
           );
         })
-        .sort((a, b) =>
-          a.name.localeCompare(
-            b.name
-          )
-        );
+        ;
+
+      // Fiches déjà ouvertes + filmographie : on fusionne sans doublon.
+      const merged = new Map<string, CatalogMovie>();
+
+      for (const movie of fromCache) merged.set(movie.id, movie);
+      for (const movie of filmographyMovies) merged.set(movie.id, movie);
+
+      return [...merged.values()].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
     }, [
       actor,
       visibleMovies,
       index,
+      filmographyMovies,
     ]);
 
   const actorPageCount =
@@ -1444,10 +1506,20 @@ export default function MovieDetails() {
                   {actor}
                 </h2>
 
-                <p className="mt-1 text-xs leading-5 text-zinc-500">
-                  {
-                    labels.partial
-                  }
+                <p className="mt-1 flex items-center gap-2 text-xs leading-5 text-zinc-500">
+                  {filmography.status === 'loading' && (
+                    <Loader2
+                      className="h-3 w-3 animate-spin"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {filmography.status === 'loading'
+                    ? labels.actorLoading
+                    : filmography.status === 'ready'
+                    ? labels.actorSource
+                    : filmography.status === 'error'
+                    ? labels.actorError
+                    : labels.partial}
                 </p>
               </div>
 
@@ -1495,9 +1567,9 @@ export default function MovieDetails() {
                 </div>
               ) : (
                 <p className="py-8 text-center text-sm text-zinc-400">
-                  {
-                    labels.noMatches
-                  }
+                  {filmography.status === 'loading'
+                    ? labels.actorLoading
+                    : labels.noMatches}
                 </p>
               )}
 
