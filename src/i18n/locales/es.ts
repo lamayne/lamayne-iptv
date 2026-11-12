@@ -128,6 +128,11 @@ export const es: Record<string, string> = {
   'backend.xtreamNoChannelList': 'El servidor Xtream no ha devuelto una lista de canales.',
   'backend.xtreamTimeout': 'La conexión con el servidor Xtream ha superado el tiempo permitido.',
   'backend.xtreamUrlInvalid': 'Dirección del servidor Xtream no válida.',
+    'backend.actorNameInvalid': 'Nombre de actor no válido.',
+  'backend.filmographyUnreachable': 'No se pudo contactar con el servicio de filmografía.',
+  'backend.filmographyHttp': 'El servicio de filmografía ha respondido con el estado HTTP {status}.',
+  'backend.filmographyUnexpected': 'Respuesta inesperada del servicio de filmografía.',
+  
   // boot
   'boot.connecting': 'Conectando con tu proveedor…',
   'boot.loading': 'Cargando…',
@@ -324,6 +329,9 @@ export const es: Record<string, string> = {
   'movie.pas_encore_de_recommandation_pertinente_': 'Todavía no hay ninguna recomendación relevante en tus categorías visibles.',
   'movie.progression_du_film': 'Progreso de la película',
   'movie.uniquement_des_films_de_votre_source': 'Solo películas de tu fuente y de tus categorías visibles. Las sugerencias mejoran a medida que consultas fichas de películas.',
+    'movie.actor_loading': 'Buscando la filmografía…',
+  'movie.actor_source': 'Filmografía: Wikidata. Solo se muestran los títulos presentes en tu catálogo.',
+  'movie.actor_error': 'Filmografía no disponible: solo se muestran las películas ya consultadas.',
   // movies
   'movies.addFavorite': 'Añadir',
   'movies.allCategories': 'Todas las categorías',
