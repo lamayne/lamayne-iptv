@@ -1,0 +1,58 @@
+name: Android TV build (test)
+
+# Builds a DEBUG apk of the Android TV / Google TV app, for sideloading on a TV.
+# Run it by hand: Actions -> Android TV build (test) -> Run workflow.
+# The apk is attached to the pre-release "tv-test" (stable download address) and
+# kept as a workflow artifact.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+
+      - name: Build the debug apk
+        working-directory: tv
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Name the apk
+        run: |
+          mkdir -p out
+          cp tv/app/build/outputs/apk/debug/app-debug.apk out/LAMAYNE-TV-test.apk
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lamayne-tv-apk
+          path: out/LAMAYNE-TV-test.apk
+          if-no-files-found: error
+
+      - name: Attach the apk to the pre-release "tv-test"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: tv-test
+          name: Android TV test build (unstable)
+          body: |
+            Debug build of the Android TV / Google TV app, for testing only.
+            Install with the Downloader app, using the address in tv/README.md.
+            LAMAYNE IPTV provides no content.
+          prerelease: true
+          make_latest: "false"
+          files: out/LAMAYNE-TV-test.apk
