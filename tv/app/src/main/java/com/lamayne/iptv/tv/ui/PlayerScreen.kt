@@ -57,7 +57,6 @@ import androidx.media3.common.Tracks
 import androidx.media3.ui.PlayerView
 import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.data.Channel
-import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.data.EpgEntry
 import com.lamayne.iptv.tv.data.EpgInfo
 import kotlinx.coroutines.delay
@@ -81,6 +80,7 @@ fun LivePlayerScreen(
     var failure by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf("") }
     var paused by remember { mutableStateOf(false) }
+    var buffering by remember { mutableStateOf(true) }
     var overlay by remember { mutableStateOf(true) }
     var touch by remember { mutableLongStateOf(0L) }
     val currentUrls by rememberUpdatedState(urls)
@@ -115,6 +115,10 @@ fun LivePlayerScreen(
                 info = describeTracks(tracks)
             }
 
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                buffering = playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_IDLE
+            }
+
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 paused = !playWhenReady
             }
@@ -132,6 +136,7 @@ fun LivePlayerScreen(
     LaunchedEffect(channel.id) {
         attempt = 0
         failure = null
+        buffering = true
         info = ""
         exoPlayer.setMediaItem(MediaItem.fromUri(currentUrls[0]))
         exoPlayer.prepare()
@@ -214,6 +219,10 @@ fun LivePlayerScreen(
             },
         )
 
+        if (buffering && failure == null) {
+            LoadingBadge(stringResource(R.string.common_loading), Modifier.align(Alignment.Center))
+        }
+
         if (overlay) {
             // ---- top: which channel
             val label = channelLabel(channel.name)
@@ -267,51 +276,39 @@ fun LivePlayerScreen(
                         }
                     }
                 }
+
+                Spacer(Modifier.weight(1f))
+
+                Text(
+                    stringResource(R.string.player_hint_live),
+                    color = Color(0xFFB8B8CC),
+                    fontSize = 12.sp,
+                )
             }
 
-            // ---- bottom: what is on now, what comes next, controls
-            Column(
+            // ---- bottom: one slim row: buttons, what is on now, what comes next
+            val nowSeconds = System.currentTimeMillis() / 1000
+
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF5000000))))
-                    .padding(horizontal = 48.dp, vertical = 26.dp),
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF0000000))))
+                    .padding(horizontal = 48.dp, vertical = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                val nowSeconds = System.currentTimeMillis() / 1000
-
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    GuideCard(
-                        label = stringResource(R.string.guide_now),
-                        highlighted = true,
-                        entry = epg?.now,
-                        nowSeconds = nowSeconds,
-                        emptyText = stringResource(R.string.guide_empty),
-                        modifier = Modifier.weight(1.5f),
-                    )
-
-                    GuideCard(
-                        label = stringResource(R.string.guide_next),
-                        highlighted = false,
-                        entry = epg?.next,
-                        nowSeconds = nowSeconds,
-                        emptyText = stringResource(R.string.guide_empty),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
-                Spacer(Modifier.height(18.dp))
-
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    RoundButton(onClick = { onZap(-1) }) {
-                        SkipGlyph(forward = false, color = Color.White, glyphSize = 30.dp)
+                    RoundButton(onClick = { onZap(-1) }, size = 46.dp) {
+                        SkipGlyph(forward = false, color = Color.White, glyphSize = 22.dp)
                     }
 
                     RoundButton(
                         onClick = { togglePause() },
-                        size = 72.dp,
+                        size = 56.dp,
                         accent = true,
                         focusRequester = playFocus,
                     ) {
@@ -320,34 +317,44 @@ fun LivePlayerScreen(
                                 Icons.Filled.PlayArrow,
                                 contentDescription = null,
                                 tint = Color.White,
-                                modifier = Modifier.size(40.dp),
+                                modifier = Modifier.size(30.dp),
                             )
                         } else {
-                            PauseGlyph(color = Color.White, glyphSize = 38.dp)
+                            PauseGlyph(color = Color.White, glyphSize = 28.dp)
                         }
                     }
 
-                    RoundButton(onClick = { onZap(1) }) {
-                        SkipGlyph(forward = true, color = Color.White, glyphSize = 30.dp)
+                    RoundButton(onClick = { onZap(1) }, size = 46.dp) {
+                        SkipGlyph(forward = true, color = Color.White, glyphSize = 22.dp)
                     }
 
-                    RoundButton(onClick = { onToggleFavorite() }) {
+                    RoundButton(onClick = { onToggleFavorite() }, size = 46.dp) {
                         Icon(
                             if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             contentDescription = null,
                             tint = if (favorite) Accent else Color.White,
-                            modifier = Modifier.size(30.dp),
+                            modifier = Modifier.size(22.dp),
                         )
                     }
-
-                    Spacer(Modifier.weight(1f))
-
-                    Text(
-                        stringResource(R.string.player_hint_live),
-                        color = Color(0xFFB8B8CC),
-                        fontSize = 14.sp,
-                    )
                 }
+
+                GuideCard(
+                    label = stringResource(R.string.guide_now),
+                    highlighted = true,
+                    entry = epg?.now,
+                    nowSeconds = nowSeconds,
+                    emptyText = stringResource(R.string.guide_empty),
+                    modifier = Modifier.weight(1.5f),
+                )
+
+                GuideCard(
+                    label = stringResource(R.string.guide_next),
+                    highlighted = false,
+                    entry = epg?.next,
+                    nowSeconds = nowSeconds,
+                    emptyText = stringResource(R.string.guide_empty),
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
 
@@ -375,7 +382,8 @@ fun LivePlayerScreen(
     }
 }
 
-// "Now" or "Next": time range, title and, for the programme on air, a progress bar.
+// "Now" or "Next": a slim card with the time, the title and, for the programme on air,
+// a progress bar and the minutes left.
 @Composable
 private fun GuideCard(
     label: String,
@@ -385,54 +393,54 @@ private fun GuideCard(
     emptyText: String,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(14.dp)
 
     Column(
         modifier = modifier
             .clip(shape)
             .background(Color(0x99101018))
             .border(1.dp, if (highlighted) Color(0x668B5CF6) else Color(0x22FFFFFF), shape)
-            .padding(18.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 label.uppercase(),
                 color = if (highlighted) AccentBright else Muted,
-                fontSize = 12.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 3.sp,
+                letterSpacing = 2.sp,
             )
 
             if (entry != null) {
                 Spacer(Modifier.weight(1f))
-                Text("${formatClock(entry.start)} - ${formatClock(entry.stop)}", color = Muted, fontSize = 13.sp)
+                Text("${formatClock(entry.start)} - ${formatClock(entry.stop)}", color = Muted, fontSize = 11.sp)
             }
         }
 
-        Spacer(Modifier.height(6.dp))
-
         if (entry == null) {
-            Text(emptyText, color = Muted, fontSize = 16.sp)
+            Text(emptyText, color = Muted, fontSize = 13.sp, maxLines = 1)
         } else {
             Text(
                 entry.title,
                 color = Color.White,
-                fontSize = if (highlighted) 22.sp else 18.sp,
-                fontWeight = if (highlighted) FontWeight.Bold else FontWeight.SemiBold,
-                maxLines = 2,
+                fontSize = if (highlighted) 15.sp else 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
 
             if (highlighted) {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(5.dp))
 
-                ProgressLine(entry.progress(nowSeconds), Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ProgressLine(entry.progress(nowSeconds), Modifier.weight(1f))
 
-                Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.width(10.dp))
 
-                val minutes = ((entry.stop - nowSeconds) / 60).coerceAtLeast(0)
+                    val minutes = ((entry.stop - nowSeconds) / 60).coerceAtLeast(0)
 
-                Text(stringResource(R.string.guide_left, minutes.toInt()), color = Muted, fontSize = 13.sp)
+                    Text(stringResource(R.string.guide_left, minutes.toInt()), color = Muted, fontSize = 11.sp, maxLines = 1)
+                }
             }
         }
     }

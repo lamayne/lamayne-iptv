@@ -12,11 +12,12 @@ fun channelToJson(c: Channel): JSONObject =
         .put("name", c.name)
         .put("icon", c.icon ?: "")
         .put("cat", c.categoryId ?: "")
+        .put("url", c.url ?: "")
 
 fun channelFromJson(o: JSONObject): Channel? {
     val id = o.text("id") ?: return null
 
-    return Channel(id, o.optString("name"), o.text("icon"), o.text("cat"))
+    return Channel(id, o.optString("name"), o.text("icon"), o.text("cat"), o.text("url"))
 }
 
 fun movieToJson(m: Movie): JSONObject =

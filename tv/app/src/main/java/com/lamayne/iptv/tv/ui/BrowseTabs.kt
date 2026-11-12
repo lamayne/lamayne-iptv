@@ -48,7 +48,7 @@ fun MoviesTab(viewModel: MainViewModel) {
 
         LazyVerticalGrid(
             state = gridState,
-            columns = GridCells.Adaptive(142.dp),
+            columns = GridCells.Adaptive(90.dp),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 30.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),

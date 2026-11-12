@@ -82,10 +82,8 @@ fun SettingsTab(viewModel: MainViewModel) {
     val credentials by viewModel.credentials.collectAsStateWithLifecycle()
     var language by remember { mutableStateOf(viewModel.settings.language) }
     var refreshMessage by remember { mutableStateOf<String?>(null) }
-    var browserMessage by remember { mutableStateOf<String?>(null) }
     val refreshing = stringResource(R.string.settings_refreshed)
-    val noBrowser = stringResource(R.string.settings_no_browser)
-    val qr = remember { Qr.make(SUPPORT_URL) }
+    val qr = remember { Qr.make(NEWS_URL) }
     var message by remember { mutableStateOf<String?>(null) }
     val cleared = stringResource(R.string.settings_cleared)
 
@@ -195,7 +193,7 @@ fun SettingsTab(viewModel: MainViewModel) {
 
                 Spacer(Modifier.height(14.dp))
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_live),
                         onClick = {
@@ -217,11 +215,6 @@ fun SettingsTab(viewModel: MainViewModel) {
                             refreshMessage = refreshing
                         },
                     )
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_guide),
                         onClick = {
@@ -282,9 +275,6 @@ fun SettingsTab(viewModel: MainViewModel) {
 
                 Text(stringResource(R.string.settings_disclaimer), color = Muted, fontSize = 15.sp)
 
-                Spacer(Modifier.height(8.dp))
-
-                Text("github.com/lamayne/lamayne-iptv", color = AccentBright, fontSize = 15.sp)
             }
         }
 
@@ -296,67 +286,26 @@ fun SettingsTab(viewModel: MainViewModel) {
                             bitmap = qr,
                             contentDescription = null,
                             modifier = Modifier
-                                .size(150.dp)
+                                .size(160.dp)
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(Color.White)
                                 .padding(8.dp),
                         )
 
-                        Spacer(Modifier.width(22.dp))
+                        Spacer(Modifier.width(24.dp))
                     }
 
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.settings_support_text), color = TextMain, fontSize = 16.sp)
-
-                        Spacer(Modifier.height(6.dp))
-
-                        Text(SUPPORT_URL, color = AccentBright, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-
-                        Spacer(Modifier.height(4.dp))
-
-                        Text(stringResource(R.string.settings_scan), color = Muted, fontSize = 13.sp)
-
-                        Spacer(Modifier.height(12.dp))
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            ActionButton(
-                                text = stringResource(R.string.settings_support_open),
-                                primary = true,
-                                onClick = {
-                                    browserMessage = if (openLink(context, SUPPORT_URL)) null else noBrowser
-                                },
-                            )
-                            ActionButton(
-                                text = stringResource(R.string.settings_news_open),
-                                onClick = {
-                                    browserMessage = if (openLink(context, NEWS_URL)) null else noBrowser
-                                },
-                            )
-                        }
-
-                        val warning = browserMessage
-
-                        if (warning != null) {
-                            Spacer(Modifier.height(8.dp))
-                            Text(warning, color = Danger, fontSize = 14.sp)
-                        }
-                    }
+                    Text(
+                        stringResource(R.string.settings_support_text),
+                        color = TextMain,
+                        fontSize = 17.sp,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }
     }
 }
 
-private const val SUPPORT_URL = "https://buymeacoffee.com/lamayne"
+// The QR code leads to the Linktree (news, updates and the way to support the project).
 private const val NEWS_URL = "https://linktr.ee/lamayne"
-
-// Most TVs have no browser: false when nothing could open the link.
-private fun openLink(context: Context, url: String): Boolean =
-    try {
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
-        true
-    } catch (e: Exception) {
-        false
-    }

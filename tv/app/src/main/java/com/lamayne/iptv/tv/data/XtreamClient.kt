@@ -196,6 +196,8 @@ object XtreamClient {
     // Two ways to ask for the same live stream: MPEG-TS first (works almost
     // everywhere), then HLS.
     fun streamUrls(credentials: Credentials, channel: Channel): List<String> {
+        channel.url?.let { return listOf(it) }
+
         val base = "${credentials.server}/live/${Uri.encode(credentials.user)}/" +
             "${Uri.encode(credentials.pass)}/${channel.id}"
 

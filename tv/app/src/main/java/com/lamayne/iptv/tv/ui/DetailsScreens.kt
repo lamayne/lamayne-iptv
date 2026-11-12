@@ -121,6 +121,24 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
 
     LaunchedEffect(Unit) { runCatching { playFocus.requestFocus() } }
 
+    var askResume by remember { mutableStateOf(false) }
+
+    if (askResume && saved != null) {
+        ResumeDialog(
+            title = displayName(movie.name),
+            positionMs = saved.position,
+            onResume = {
+                askResume = false
+                viewModel.playMovie(movie, resume = true)
+            },
+            onRestart = {
+                askResume = false
+                viewModel.playMovie(movie, resume = false)
+            },
+            onDismiss = { askResume = false },
+        )
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Backdrop(info?.backdrop ?: movie.poster, movie.name)
 
@@ -178,12 +196,11 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ActionButton(
-                        text = if (canResume && saved != null) {
-                            stringResource(R.string.details_resume, formatDuration(saved.position))
-                        } else {
-                            stringResource(R.string.details_play)
+                        text = stringResource(R.string.details_play),
+                        onClick = {
+                            // Already started: ask whether to resume or start over.
+                            if (canResume) askResume = true else viewModel.playMovie(movie, resume = false)
                         },
-                        onClick = { viewModel.playMovie(movie, resume = true) },
                         primary = true,
                         focusRequester = playFocus,
                         icon = {
@@ -196,13 +213,6 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
                         },
                     )
 
-                    if (canResume) {
-                        ActionButton(
-                            text = stringResource(R.string.details_restart),
-                            onClick = { viewModel.playMovie(movie, resume = false) },
-                        )
-                    }
-
                     ActionButton(
                         text = stringResource(
                             if (favorite) R.string.details_favorite_remove else R.string.details_favorite_add
@@ -210,6 +220,23 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
                         onClick = { viewModel.toggleFavorite(movie) },
                         icon = { HeartIcon(favorite) },
                     )
+                }
+
+                // How far you got.
+                if (canResume && saved != null) {
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ProgressLine(saved.fraction, Modifier.width(220.dp))
+
+                        Spacer(Modifier.width(12.dp))
+
+                        Text(
+                            formatDuration(saved.position) + " / " + formatDuration(saved.duration),
+                            color = Muted,
+                            fontSize = 13.sp,
+                        )
+                    }
                 }
 
                 val director = info?.director

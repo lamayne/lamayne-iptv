@@ -94,6 +94,10 @@ fun VodPlayerScreen(
     var tracks by remember { mutableStateOf<Tracks?>(null) }
     // 0 = nothing, 1 = audio tracks, 2 = subtitles
     var picker by remember { mutableStateOf(0) }
+    var previousPicker by remember { mutableStateOf(0) }
+    var buffering by remember { mutableStateOf(true) }
+    val audioFocus = remember { FocusRequester() }
+    val subFocus = remember { FocusRequester() }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
     val exoPlayer = remember { createPlayer(context) }
@@ -141,6 +145,8 @@ fun VodPlayerScreen(
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
+                buffering = playbackState == Player.STATE_BUFFERING || playbackState == Player.STATE_IDLE
+
                 if (playbackState == Player.STATE_ENDED) {
                     val total = exoPlayer.duration
 
@@ -205,6 +211,17 @@ fun VodPlayerScreen(
         runCatching {
             if (overlay) playFocus.requestFocus() else rootFocus.requestFocus()
         }
+    }
+
+    // Closing the audio / subtitles list: the cursor goes back to the button that opened it
+    // (without this it was lost and nothing could be selected any more).
+    LaunchedEffect(picker) {
+        if (picker == 0 && previousPicker != 0) {
+            delay(60)
+            runCatching { (if (previousPicker == 1) audioFocus else subFocus).requestFocus() }
+        }
+
+        previousPicker = picker
     }
 
     Box(
@@ -281,6 +298,10 @@ fun VodPlayerScreen(
                 }
             },
         )
+
+        if (buffering && failure == null) {
+            LoadingBadge(stringResource(R.string.common_loading), Modifier.align(Alignment.Center))
+        }
 
         if (overlay) {
             // ---- top: what is playing
@@ -373,11 +394,13 @@ fun VodPlayerScreen(
                     ActionButton(
                         text = stringResource(R.string.player_audio) + "  " + audioOptions.size,
                         onClick = { picker = 1 },
+                        focusRequester = audioFocus,
                     )
 
                     ActionButton(
                         text = stringResource(R.string.player_subtitles) + "  " + textOptions.size,
                         onClick = { picker = 2 },
+                        focusRequester = subFocus,
                     )
 
                     RoundButton(onClick = { onToggleFavorite() }) {

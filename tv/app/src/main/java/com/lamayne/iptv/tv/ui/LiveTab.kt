@@ -51,7 +51,7 @@ fun LiveTab(viewModel: MainViewModel) {
         ) {
             itemsIndexed(list) { index, channel ->
                 // Each visible line asks for its own programme (3 at a time).
-                LaunchedEffect(channel.id, epgVersion) { viewModel.requestEpg(channel.id) }
+                LaunchedEffect(channel.id, epgVersion) { viewModel.requestEpg(channel) }
 
                 ChannelRow(
                     channel = channel,

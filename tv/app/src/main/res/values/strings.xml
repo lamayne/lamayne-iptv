@@ -55,7 +55,7 @@
     <string name="home_my_channels">My channels</string>
     <string name="home_my_movies">My movies</string>
     <string name="home_my_series">My series</string>
-    <string name="home_nothing">Nothing to show yet. Browse Movies or Series to get started.</string>
+    <string name="home_nothing">Nothing to show yet. Open Live TV, Movies or Series to get started.</string>
     <string name="home_preparing">Preparing your recommendations...</string>
     <string name="kind_movie">Movie</string>
     <string name="kind_series">Series</string>
@@ -64,6 +64,10 @@
     <string name="live_no_guide">No programme information</string>
     <string name="login_connect">Connect</string>
     <string name="login_connecting">Connecting...</string>
+    <string name="login_m3u_label">M3U link (http…)</string>
+    <string name="login_m3u_tip">A link from your provider. If it carries an Xtream account (get.php?username=…), everything works; a plain playlist gives Live TV only.</string>
+    <string name="login_mode_m3u">M3U link</string>
+    <string name="login_mode_xtream">Xtream account</string>
     <string name="login_pass">Password</string>
     <string name="login_server">Server address, e.g. http://host:8080</string>
     <string name="login_subtitle">Use the details your provider gave you (Xtream Codes).</string>
@@ -114,21 +118,17 @@
     <string name="settings_language">Language</string>
     <string name="settings_language_auto">Automatic</string>
     <string name="settings_language_hint">The movies and series suggested on the home page follow this language.</string>
-    <string name="settings_news_open">News (Linktree)</string>
-    <string name="settings_no_browser">No browser on this TV: scan the code with your phone.</string>
     <string name="settings_refresh">Update</string>
-    <string name="settings_refresh_all">Update everything</string>
-    <string name="settings_refresh_guide">TV guide (EPG)</string>
+    <string name="settings_refresh_all">Update all</string>
+    <string name="settings_refresh_guide">Guide</string>
     <string name="settings_refresh_hint">Download the lists again from your provider (new channels, movies and series).</string>
     <string name="settings_refresh_live">Live TV</string>
     <string name="settings_refresh_movies">Movies</string>
     <string name="settings_refresh_series">Series</string>
     <string name="settings_refreshed">Updating… the lists reload when you open them.</string>
-    <string name="settings_scan">Scan the code with your phone.</string>
     <string name="settings_sign_out">Sign out</string>
-    <string name="settings_support">Support the project</string>
-    <string name="settings_support_open">Open the link</string>
-    <string name="settings_support_text">If the app is useful to you, you can support its future updates on Buy Me a Coffee.</string>
+    <string name="settings_support">Support and news</string>
+    <string name="settings_support_text">Scan the code with your phone: news, updates and a way to support the project.</string>
     <string name="settings_version">version %1$s</string>
     <string name="settings_visible">Visible content</string>
     <string name="settings_visible_hint">Providers send hundreds of categories. Choose the ones you want to see.</string>

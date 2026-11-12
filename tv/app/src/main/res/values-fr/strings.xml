@@ -55,7 +55,7 @@
     <string name="home_my_channels">Mes chaînes</string>
     <string name="home_my_movies">Mes films</string>
     <string name="home_my_series">Mes séries</string>
-    <string name="home_nothing">Rien à afficher pour le moment. Parcourez les films ou les séries pour commencer.</string>
+    <string name="home_nothing">Rien à afficher pour le moment. Ouvrez la TV en direct, les films ou les séries pour commencer.</string>
     <string name="home_preparing">Préparation de vos recommandations…</string>
     <string name="kind_movie">Film</string>
     <string name="kind_series">Série</string>
@@ -64,6 +64,10 @@
     <string name="live_no_guide">Pas d\'information de programme</string>
     <string name="login_connect">Se connecter</string>
     <string name="login_connecting">Connexion…</string>
+    <string name="login_m3u_label">Lien M3U (http…)</string>
+    <string name="login_m3u_tip">Un lien de votre fournisseur. S’il contient un compte Xtream (get.php?username=…), tout fonctionne ; une simple playlist donne uniquement la TV en direct.</string>
+    <string name="login_mode_m3u">Lien M3U</string>
+    <string name="login_mode_xtream">Compte Xtream</string>
     <string name="login_pass">Mot de passe</string>
     <string name="login_server">Adresse du serveur, ex. http://hote:8080</string>
     <string name="login_subtitle">Utilisez les informations de votre fournisseur (Xtream Codes).</string>
@@ -114,21 +118,17 @@
     <string name="settings_language">Langue</string>
     <string name="settings_language_auto">Automatique</string>
     <string name="settings_language_hint">Les films et séries proposés sur l’accueil suivent cette langue.</string>
-    <string name="settings_news_open">Actualités (Linktree)</string>
-    <string name="settings_no_browser">Pas de navigateur sur cette TV : scannez le code avec votre téléphone.</string>
     <string name="settings_refresh">Mise à jour</string>
     <string name="settings_refresh_all">Tout mettre à jour</string>
-    <string name="settings_refresh_guide">Guide TV (EPG)</string>
+    <string name="settings_refresh_guide">Guide</string>
     <string name="settings_refresh_hint">Télécharge de nouveau les listes de votre fournisseur (nouvelles chaînes, films et séries).</string>
     <string name="settings_refresh_live">Live TV</string>
     <string name="settings_refresh_movies">Films</string>
     <string name="settings_refresh_series">Séries</string>
     <string name="settings_refreshed">Mise à jour… les listes se rechargent quand vous les ouvrez.</string>
-    <string name="settings_scan">Scannez le code avec votre téléphone.</string>
     <string name="settings_sign_out">Se déconnecter</string>
-    <string name="settings_support">Soutenir le projet</string>
-    <string name="settings_support_open">Ouvrir le lien</string>
-    <string name="settings_support_text">Si l’application vous est utile, vous pouvez soutenir ses prochaines mises à jour sur Buy Me a Coffee.</string>
+    <string name="settings_support">Soutien et actualités</string>
+    <string name="settings_support_text">Scannez le code avec votre téléphone : actualités, mises à jour et moyen de soutenir le projet.</string>
     <string name="settings_version">version %1$s</string>
     <string name="settings_visible">Contenu visible</string>
     <string name="settings_visible_hint">Les fournisseurs envoient des centaines de catégories. Choisissez celles que vous voulez voir.</string>

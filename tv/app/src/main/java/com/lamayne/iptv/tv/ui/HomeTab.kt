@@ -75,7 +75,7 @@ fun HomeTab(viewModel: MainViewModel) {
 
     // The favourite channels show what is on now.
     LaunchedEffect(favChannels, epgVersion) {
-        favChannels.take(30).forEach { viewModel.requestEpg(it.id) }
+        favChannels.take(30).forEach { viewModel.requestEpg(it) }
     }
 
     LaunchedEffect(featured.isNotEmpty()) {
@@ -84,7 +84,7 @@ fun HomeTab(viewModel: MainViewModel) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(top = 4.dp, bottom = 56.dp),
+        contentPadding = PaddingValues(top = 0.dp, bottom = 56.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
@@ -214,8 +214,9 @@ fun HomeTab(viewModel: MainViewModel) {
     }
 }
 
-// The big banner: one movie or series at a time, on a rounded card. It changes by
-// itself every few seconds, and left / right change it by hand.
+// The big banner, like on a streaming home page: full width, behind the top bar, text on
+// the left, and the bottom fading into the page so the rows below follow on from it.
+// One movie or series at a time; it changes by itself, and left / right change it by hand.
 @Composable
 private fun Hero(
     featured: List<Featured>,
@@ -240,7 +241,7 @@ private fun Hero(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(190.dp),
+                .height(280.dp),
             contentAlignment = Alignment.Center,
         ) {
             when {
@@ -259,15 +260,11 @@ private fun Hero(
     }
 
     val slide = featured[index % count]
-    val shape = RoundedCornerShape(28.dp)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 48.dp)
-            .height(330.dp)
-            .clip(shape)
-            .border(1.dp, Color(0x26FFFFFF), shape)
+            .height(460.dp)
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown || count < 2) {
                     false
@@ -287,29 +284,40 @@ private fun Hero(
             },
     ) {
         // The top of the picture stays visible: only the bottom is cut when it is too tall.
-        PosterImage(slide.backdrop, slide.title, Modifier.fillMaxSize(), alignment = BiasAlignment(0f, -0.7f))
+        PosterImage(slide.backdrop, slide.title, Modifier.fillMaxSize(), alignment = BiasAlignment(0f, -0.8f))
 
+        // Left: keeps the text readable.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.horizontalGradient(
-                        listOf(Color(0xF50A0A12), Color(0xCC0A0A12), Color(0x330A0A12), Color.Transparent)
+                        listOf(Color(0xF20A0A12), Color(0xB30A0A12), Color(0x330A0A12), Color.Transparent)
                     )
                 ),
         )
 
+        // Top: under the menu.
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xCC0A0A12)))),
+                .fillMaxWidth()
+                .height(130.dp)
+                .background(Brush.verticalGradient(listOf(Color(0xCC0A0A12), Color.Transparent))),
         )
 
-        // The text sits at the bottom of the card: the title is always visible.
+        // Bottom: melts into the page.
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .height(190.dp)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Bg))),
+        )
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 36.dp, bottom = 28.dp)
+                .padding(start = 48.dp, bottom = 46.dp)
                 .width(520.dp),
         ) {
             Text(
@@ -327,9 +335,9 @@ private fun Hero(
             Text(
                 displayName(slide.title),
                 color = Color.White,
-                fontSize = 32.sp,
+                fontSize = 36.sp,
                 fontWeight = FontWeight.Bold,
-                lineHeight = 36.sp,
+                lineHeight = 40.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -359,7 +367,7 @@ private fun Hero(
                     slide.plot,
                     color = Color(0xFFE0E0EC),
                     fontSize = 14.sp,
-                    maxLines = 2,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -387,7 +395,7 @@ private fun Hero(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 32.dp, bottom = 32.dp),
+                    .padding(end = 48.dp, bottom = 52.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

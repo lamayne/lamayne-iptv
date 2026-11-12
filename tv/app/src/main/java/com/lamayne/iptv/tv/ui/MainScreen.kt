@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lamayne.iptv.tv.MainViewModel
 import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.Tab
+import com.lamayne.iptv.tv.data.isM3u
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
@@ -42,15 +43,29 @@ fun MainScreen(viewModel: MainViewModel) {
     // Back goes to the home page first, then leaves the app.
     BackHandler(enabled = tab != Tab.HOME) { viewModel.selectTab(Tab.HOME) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopBar(tab) { viewModel.selectTab(it) }
+    // A plain M3U playlist has no movies or series.
+    val credentials by viewModel.credentials.collectAsStateWithLifecycle()
+    val tabs = Tab.values().filter { !(credentials?.isM3u == true && (it == Tab.MOVIES || it == Tab.SERIES)) }
 
-        when (tab) {
-            Tab.HOME -> HomeTab(viewModel)
-            Tab.LIVE -> LiveTab(viewModel)
-            Tab.MOVIES -> MoviesTab(viewModel)
-            Tab.SERIES -> SeriesTab(viewModel)
-            Tab.SETTINGS -> SettingsTab(viewModel)
+    if (tab == Tab.HOME) {
+        // The home banner goes behind the menu.
+        Box(modifier = Modifier.fillMaxSize()) {
+            HomeTab(viewModel)
+
+            Box(modifier = Modifier.align(Alignment.TopStart)) {
+                TopBar(tab, tabs, overlay = true) { viewModel.selectTab(it) }
+            }
+        }
+    } else {
+        Column(modifier = Modifier.fillMaxSize()) {
+            TopBar(tab, tabs, overlay = false) { viewModel.selectTab(it) }
+
+            when (tab) {
+                Tab.LIVE -> LiveTab(viewModel)
+                Tab.MOVIES -> MoviesTab(viewModel)
+                Tab.SERIES -> SeriesTab(viewModel)
+                else -> SettingsTab(viewModel)
+            }
         }
     }
 }
@@ -68,7 +83,7 @@ private fun labelOf(tab: Tab): String =
     )
 
 @Composable
-private fun TopBar(current: Tab, onSelect: (Tab) -> Unit) {
+private fun TopBar(current: Tab, tabs: List<Tab>, overlay: Boolean, onSelect: (Tab) -> Unit) {
     val clock by produceState(initialValue = currentClock()) {
         while (true) {
             delay(15_000)
@@ -79,6 +94,10 @@ private fun TopBar(current: Tab, onSelect: (Tab) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (overlay) Modifier.background(Brush.verticalGradient(listOf(Color(0xD90A0A12), Color.Transparent)))
+                else Modifier
+            )
             .padding(horizontal = 48.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -101,7 +120,7 @@ private fun TopBar(current: Tab, onSelect: (Tab) -> Unit) {
                 .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            for (tab in Tab.values()) {
+            for (tab in tabs) {
                 TabPill(labelOf(tab), tab == current, onClick = { onSelect(tab) })
             }
         }

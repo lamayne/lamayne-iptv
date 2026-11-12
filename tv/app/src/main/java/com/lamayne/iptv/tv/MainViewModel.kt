@@ -1,6 +1,7 @@
 package com.lamayne.iptv.tv
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lamayne.iptv.tv.data.BrowseController
@@ -15,7 +16,11 @@ import com.lamayne.iptv.tv.data.Featured
 import com.lamayne.iptv.tv.data.Filmography
 import com.lamayne.iptv.tv.data.JsonListStore
 import com.lamayne.iptv.tv.data.Loadable
+import com.lamayne.iptv.tv.data.M3U_USER
+import com.lamayne.iptv.tv.data.M3uClient
 import com.lamayne.iptv.tv.data.MediaInfo
+import com.lamayne.iptv.tv.data.isM3u
+import com.lamayne.iptv.tv.ui.channelName
 import com.lamayne.iptv.tv.data.MediaKind
 import com.lamayne.iptv.tv.data.Movie
 import com.lamayne.iptv.tv.data.Series
@@ -207,8 +212,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val live = BrowseController<Channel>(
         viewModelScope,
-        { c -> XtreamClient.liveCategories(c) },
-        { c, id -> XtreamClient.liveChannels(c, id) },
+        { c -> if (c.isM3u) M3uClient.categories(c) else XtreamClient.liveCategories(c) },
+        { c, id -> if (c.isM3u) M3uClient.channels(c, id) else XtreamClient.liveChannels(c, id) },
         { _hiddenLive.value },
     )
 
@@ -317,6 +322,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         MediaKind.SERIES to Mutex(),
     )
     private var movieTitleMap: Map<String, List<Pair<Movie, Int?>>>? = null
+    private var channelKeyMap: Map<String, List<Channel>>? = null
     private val filmographyCache = HashMap<String, Filmography.Result>()
 
     private var homeJob: Job? = null
@@ -377,6 +383,50 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // A link from the provider. When it carries the account of an Xtream server
+    // (get.php?username=...&password=...), the account is used as such; otherwise it
+    // is a plain playlist: Live TV only.
+    fun loginM3u(raw: String) {
+        val url = raw.trim()
+
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            _loginError.value = UiError.InvalidAddress
+            return
+        }
+
+        val uri = Uri.parse(url)
+        val user = uri.getQueryParameter("username")
+        val pass = uri.getQueryParameter("password")
+        val host = uri.host
+
+        if (user != null && pass != null && host != null) {
+            val port = if (uri.port != -1) ":${uri.port}" else ""
+
+            login("${uri.scheme}://$host$port", user, pass)
+            return
+        }
+
+        val credentials = Credentials(url, M3U_USER, "")
+
+        viewModelScope.launch {
+            _loginBusy.value = true
+            _loginError.value = null
+
+            try {
+                M3uClient.load(url, force = true)
+                credentialStore.save(credentials)
+                _credentials.value = credentials
+                startSession(credentials)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _loginError.value = toUiError(e)
+            } finally {
+                _loginBusy.value = false
+            }
+        }
+    }
+
     fun logout() {
         homeJob?.cancel()
         playingEpgJob?.cancel()
@@ -410,6 +460,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         seriesIndex.set(emptyList())
         indexLoaded.clear()
         movieTitleMap = null
+        channelKeyMap = null
+        M3uClient.reset()
         filmographyCache.clear()
         epgCache.clear()
         seriesInfoCache.clear()
@@ -610,8 +662,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ------------------------------------------------------------------ guide
 
     // Asked by each visible channel row. At most 3 requests at a time.
-    fun requestEpg(streamId: String) {
+    fun requestEpg(channel: Channel) {
         val credentials = _credentials.value ?: return
+
+        if (credentials.isM3u) return
+
+        val streamId = channel.id
         val nowMillis = System.currentTimeMillis()
         val cached = epgCache[streamId]
 
@@ -624,7 +680,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             try {
-                val entries = epgSemaphore.withPermit { XtreamClient.shortEpg(credentials, streamId) }
+                val entries = loadEntries(credentials, channel)
 
                 epgCache[streamId] = System.currentTimeMillis() to entries
                 publishEpg(streamId, entries)
@@ -638,6 +694,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // The same channel often exists in several categories (France Premium, France FHD...)
+    // and the provider only has the guide for some of them: when this one has none, the
+    // guide of the channel with the same name is used.
+    private suspend fun loadEntries(credentials: Credentials, channel: Channel): List<EpgEntry> {
+        val own = epgSemaphore.withPermit { XtreamClient.shortEpg(credentials, channel.id) }
+
+        if (own.isNotEmpty()) return own
+
+        val key = channelKey(channel.name)
+
+        if (key.length < 2) return own
+
+        try {
+            ensureIndex(MediaKind.LIVE)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return own
+        }
+
+        val map = channelKeyMap ?: channelIndex.items()
+            .groupBy { channelKey(it.name) }
+            .also { channelKeyMap = it }
+
+        for (sibling in map[key].orEmpty().filter { it.id != channel.id }.take(5)) {
+            val entries = try {
+                epgSemaphore.withPermit { XtreamClient.shortEpg(credentials, sibling.id) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emptyList()
+            }
+
+            if (entries.isNotEmpty()) return entries
+        }
+
+        return own
+    }
+
+    // "|FR| TF1 FHD" and "TF1" give the same key.
+    private fun channelKey(name: String): String =
+        normalizeText(channelName(name)).filter { it.isLetterOrDigit() }
+
     private fun publishEpg(streamId: String, entries: List<EpgEntry>) {
         val info = EpgInfo.from(entries, System.currentTimeMillis() / 1000)
         var map = _epgMap.value + (streamId to info)
@@ -647,19 +746,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _epgMap.value = map
     }
 
-    private suspend fun fetchEpg(streamId: String): EpgInfo {
+    private suspend fun fetchEpg(channel: Channel): EpgInfo {
         val credentials = _credentials.value ?: return EpgInfo.EMPTY
+
+        if (credentials.isM3u) return EpgInfo.EMPTY
+
         val nowMillis = System.currentTimeMillis()
-        val cached = epgCache[streamId]
+        val cached = epgCache[channel.id]
 
         if (cached != null && nowMillis - cached.first < 120_000) {
             return EpgInfo.from(cached.second, nowMillis / 1000)
         }
 
         return try {
-            val entries = XtreamClient.shortEpg(credentials, streamId)
+            val entries = loadEntries(credentials, channel)
 
-            epgCache[streamId] = nowMillis to entries
+            epgCache[channel.id] = nowMillis to entries
             EpgInfo.from(entries, nowMillis / 1000)
         } catch (e: CancellationException) {
             throw e
@@ -678,6 +780,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         when (kind) {
             MediaKind.LIVE -> {
+                M3uClient.reset()
+                channelKeyMap = null
                 channelIndex.set(emptyList())
                 live.reset()
                 live.start(credentials)
@@ -788,7 +892,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playingEpgJob?.cancel()
         playingEpgJob = viewModelScope.launch {
             while (isActive) {
-                _playingEpg.value = fetchEpg(channel.id)
+                _playingEpg.value = fetchEpg(channel)
                 delay(60_000)
             }
         }
@@ -987,6 +1091,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ------------------------------------------------------------------ home
 
     private fun loadHome(credentials: Credentials) {
+        // A plain playlist has no movies or series: nothing to suggest.
+        if (credentials.isM3u) return
+
         homeJob?.cancel()
         homeJob = viewModelScope.launch {
             _homeLoading.value = true
@@ -1125,7 +1232,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 when (kind) {
                     MediaKind.LIVE -> {
-                        val list = XtreamClient.allLiveChannels(credentials)
+                        val list = if (credentials.isM3u) M3uClient.all(credentials) else XtreamClient.allLiveChannels(credentials)
 
                         withContext(Dispatchers.Default) { channelIndex.set(list) }
                     }

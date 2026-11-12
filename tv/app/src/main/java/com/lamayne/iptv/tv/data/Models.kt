@@ -8,6 +8,12 @@ data class Credentials(
     val pass: String,
 )
 
+// A plain M3U playlist is stored as an account whose address is the link of the playlist.
+const val M3U_USER = "m3u"
+
+val Credentials.isM3u: Boolean
+    get() = user == M3U_USER && pass.isEmpty()
+
 data class Category(
     val id: String,
     val name: String,
@@ -18,6 +24,8 @@ data class Channel(
     val name: String,
     val icon: String?,
     val categoryId: String?,
+    // Only for playlists (M3U): the address of the stream.
+    val url: String? = null,
 )
 
 data class Movie(
@@ -111,7 +119,7 @@ data class WatchProgress(
 
     // Started, not finished: worth proposing "continue watching".
     val inProgress: Boolean
-        get() = duration > 0 && fraction in 0.02f..0.94f
+        get() = duration > 0 && position >= 20_000 && fraction <= 0.94f
 
     val finished: Boolean
         get() = duration > 0 && fraction > 0.94f

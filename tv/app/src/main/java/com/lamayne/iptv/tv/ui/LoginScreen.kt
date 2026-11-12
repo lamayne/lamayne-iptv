@@ -45,6 +45,8 @@ fun LoginScreen(viewModel: MainViewModel) {
     var server by rememberSaveable { mutableStateOf("") }
     var user by rememberSaveable { mutableStateOf("") }
     var pass by rememberSaveable { mutableStateOf("") }
+    var mode by rememberSaveable { mutableStateOf(0) }
+    var m3u by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -76,6 +78,14 @@ fun LoginScreen(viewModel: MainViewModel) {
 
             Spacer(Modifier.height(20.dp))
 
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Pill(stringResource(R.string.login_mode_xtream), mode == 0, onClick = { mode = 0 })
+                Pill(stringResource(R.string.login_mode_m3u), mode == 1, onClick = { mode = 1 })
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            if (mode == 0) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = server,
@@ -123,6 +133,23 @@ fun LoginScreen(viewModel: MainViewModel) {
                 )
             }
 
+            } else {
+                OutlinedTextField(
+                    value = m3u,
+                    onValueChange = { m3u = it },
+                    label = { Text(stringResource(R.string.login_m3u_label)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { focusManager.moveFocus(FocusDirection.Down) },
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
             Spacer(Modifier.height(20.dp))
 
             error?.let { failure ->
@@ -131,7 +158,11 @@ fun LoginScreen(viewModel: MainViewModel) {
             }
 
             FocusCard(
-                onClick = { if (!busy) viewModel.login(server, user, pass) },
+                onClick = {
+                    if (!busy) {
+                        if (mode == 0) viewModel.login(server, user, pass) else viewModel.loginM3u(m3u)
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -152,7 +183,11 @@ fun LoginScreen(viewModel: MainViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            Text(stringResource(R.string.login_tip), color = Muted, fontSize = 13.sp)
+            Text(
+                stringResource(if (mode == 0) R.string.login_tip else R.string.login_m3u_tip),
+                color = Muted,
+                fontSize = 13.sp,
+            )
         }
     }
 }
