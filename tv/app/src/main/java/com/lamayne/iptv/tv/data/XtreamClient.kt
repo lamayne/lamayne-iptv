@@ -14,13 +14,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
 import java.io.InputStreamReader
+import java.util.TreeMap
 import java.util.concurrent.TimeUnit
 
-// Xtream Codes API: authentication, live categories and live channels.
-// The answers are read as a stream (JsonReader) so that a big list never sits
-// in memory as one huge text: this matters on small TV boxes.
+// Xtream Codes API: account, live TV, movies, series and the programme guide.
+// Answers are read as a stream (JsonReader) so that a big list never sits in
+// memory as one huge text: this matters on small TV boxes.
 object XtreamClient {
-    private const val USER_AGENT = "LAMAYNE-TV/0.1"
+    private const val USER_AGENT = "LAMAYNE-TV/0.2"
 
     class AuthException : IOException("The server refused the credentials")
 
@@ -28,8 +29,8 @@ object XtreamClient {
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .callTimeout(120, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
+        .callTimeout(180, TimeUnit.SECONDS)
         .build()
 
     fun normalizeServer(raw: String): String {
@@ -110,11 +111,15 @@ object XtreamClient {
             }
         }
 
+    // ---------------------------------------------------------------- account
+
     suspend fun authenticate(credentials: Credentials) {
         val accepted = fetch(apiUrl(credentials)) { reader -> readAuth(reader) }
 
         if (!accepted) throw AuthException()
     }
+
+    // ---------------------------------------------------------------- live TV
 
     suspend fun liveCategories(credentials: Credentials): List<Category> =
         fetch(apiUrl(credentials, "get_live_categories")) { reader ->
@@ -126,8 +131,7 @@ object XtreamClient {
             readArray(reader) { item -> readChannel(item) }
         }.filter { it.categoryId == null || it.categoryId == categoryId }
 
-    // Every live channel of the account (used by the search; about 10 MB of JSON
-    // for a big provider, read as a stream).
+    // Every live channel of the account (used by the search).
     suspend fun allLiveChannels(credentials: Credentials): List<Channel> =
         fetch(apiUrl(credentials, "get_live_streams")) { reader ->
             readArray(reader) { item -> readChannel(item) }
@@ -143,6 +147,52 @@ object XtreamClient {
             )
         ) { reader -> readEpg(reader) }
 
+    // ---------------------------------------------------------------- movies
+
+    suspend fun movieCategories(credentials: Credentials): List<Category> =
+        fetch(apiUrl(credentials, "get_vod_categories")) { reader ->
+            readArray(reader) { item -> readCategory(item) }
+        }
+
+    suspend fun movies(credentials: Credentials, categoryId: String): List<Movie> =
+        fetch(apiUrl(credentials, "get_vod_streams", mapOf("category_id" to categoryId))) { reader ->
+            readArray(reader) { item -> readMovie(item) }
+        }.filter { it.categoryId == null || it.categoryId == categoryId }
+
+    suspend fun allMovies(credentials: Credentials): List<Movie> =
+        fetch(apiUrl(credentials, "get_vod_streams")) { reader ->
+            readArray(reader) { item -> readMovie(item) }
+        }
+
+    suspend fun movieInfo(credentials: Credentials, movieId: String): MediaInfo =
+        fetch(apiUrl(credentials, "get_vod_info", mapOf("vod_id" to movieId))) { reader ->
+            readInfoRoot(reader)
+        }
+
+    // ---------------------------------------------------------------- series
+
+    suspend fun seriesCategories(credentials: Credentials): List<Category> =
+        fetch(apiUrl(credentials, "get_series_categories")) { reader ->
+            readArray(reader) { item -> readCategory(item) }
+        }
+
+    suspend fun series(credentials: Credentials, categoryId: String): List<Series> =
+        fetch(apiUrl(credentials, "get_series", mapOf("category_id" to categoryId))) { reader ->
+            readArray(reader) { item -> readSeries(item) }
+        }.filter { it.categoryId == null || it.categoryId == categoryId }
+
+    suspend fun allSeries(credentials: Credentials): List<Series> =
+        fetch(apiUrl(credentials, "get_series")) { reader ->
+            readArray(reader) { item -> readSeries(item) }
+        }
+
+    suspend fun seriesInfo(credentials: Credentials, seriesId: String): SeriesInfo =
+        fetch(apiUrl(credentials, "get_series_info", mapOf("series_id" to seriesId))) { reader ->
+            readSeriesRoot(reader)
+        }
+
+    // ---------------------------------------------------------------- addresses
+
     // Two ways to ask for the same live stream: MPEG-TS first (works almost
     // everywhere), then HLS.
     fun streamUrls(credentials: Credentials, channel: Channel): List<String> {
@@ -152,7 +202,14 @@ object XtreamClient {
         return listOf("$base.ts", "$base.m3u8")
     }
 
-    // ------------------------------------------------------------ JSON reading
+    fun vodUrl(credentials: Credentials, request: VodRequest): String {
+        val folder = if (request.kind == MediaKind.EPISODE) "series" else "movie"
+
+        return "${credentials.server}/$folder/${Uri.encode(credentials.user)}/" +
+            "${Uri.encode(credentials.pass)}/${request.id}.${request.ext}"
+    }
+
+    // ---------------------------------------------------------------- JSON reading
 
     private fun JsonReader.textOrNull(): String? =
         when (peek()) {
@@ -167,6 +224,25 @@ object XtreamClient {
                 null
             }
         }
+
+    // A value that is a text, or a list of texts (we keep the first one).
+    private fun JsonReader.firstTextOrNull(): String? {
+        if (peek() != JsonToken.BEGIN_ARRAY) return textOrNull()
+
+        var first: String? = null
+
+        beginArray()
+
+        while (hasNext()) {
+            val value = textOrNull()
+
+            if (first == null && !value.isNullOrBlank()) first = value
+        }
+
+        endArray()
+
+        return first
+    }
 
     private fun readAuth(reader: JsonReader): Boolean {
         if (reader.peek() != JsonToken.BEGIN_OBJECT) {
@@ -282,6 +358,302 @@ object XtreamClient {
             name = if (label.isNullOrEmpty()) safeId else label,
             icon = icon?.takeIf { it.isNotBlank() },
             categoryId = categoryId,
+        )
+    }
+
+    private fun readMovie(reader: JsonReader): Movie? {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+            reader.skipValue()
+            return null
+        }
+
+        var id: String? = null
+        var name: String? = null
+        var poster: String? = null
+        var categoryId: String? = null
+        var ext: String? = null
+        var rating: String? = null
+        var added = 0L
+
+        reader.beginObject()
+
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "stream_id" -> id = reader.textOrNull()
+                "name" -> name = reader.textOrNull()
+                "stream_icon" -> poster = reader.textOrNull()
+                "category_id" -> categoryId = reader.textOrNull()
+                "container_extension" -> ext = reader.textOrNull()
+                "rating" -> rating = reader.textOrNull()
+                "added" -> added = reader.textOrNull()?.toLongOrNull() ?: 0L
+                else -> reader.skipValue()
+            }
+        }
+
+        reader.endObject()
+
+        val safeId = id ?: return null
+        val label = name?.trim()
+
+        return Movie(
+            id = safeId,
+            name = if (label.isNullOrEmpty()) safeId else label,
+            poster = poster?.takeIf { it.isNotBlank() },
+            categoryId = categoryId,
+            ext = ext?.takeIf { it.isNotBlank() } ?: "mp4",
+            rating = rating?.takeIf { it.isNotBlank() },
+            added = added,
+        )
+    }
+
+    private fun readSeries(reader: JsonReader): Series? {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+            reader.skipValue()
+            return null
+        }
+
+        var id: String? = null
+        var name: String? = null
+        var poster: String? = null
+        var categoryId: String? = null
+        var rating: String? = null
+        var added = 0L
+
+        reader.beginObject()
+
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "series_id" -> id = reader.textOrNull()
+                "name" -> name = reader.textOrNull()
+                "cover" -> poster = reader.textOrNull()
+                "category_id" -> categoryId = reader.textOrNull()
+                "rating" -> rating = reader.textOrNull()
+                "last_modified" -> added = reader.textOrNull()?.toLongOrNull() ?: 0L
+                else -> reader.skipValue()
+            }
+        }
+
+        reader.endObject()
+
+        val safeId = id ?: return null
+        val label = name?.trim()
+
+        return Series(
+            id = safeId,
+            name = if (label.isNullOrEmpty()) safeId else label,
+            poster = poster?.takeIf { it.isNotBlank() },
+            categoryId = categoryId,
+            rating = rating?.takeIf { it.isNotBlank() },
+            added = added,
+        )
+    }
+
+    // The block with plot, cast, poster... (the same names are used for movies and series).
+    private fun readInfoBlock(reader: JsonReader): MediaInfo {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+            reader.skipValue()
+            return MediaInfo.EMPTY
+        }
+
+        var plot: String? = null
+        var cast: String? = null
+        var director: String? = null
+        var genre: String? = null
+        var year: String? = null
+        var rating: String? = null
+        var duration: String? = null
+        var backdrop: String? = null
+        var poster: String? = null
+
+        reader.beginObject()
+
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "plot", "description" -> plot = reader.textOrNull()
+                "cast", "actors" -> cast = reader.textOrNull()
+                "director" -> director = reader.textOrNull()
+                "genre" -> genre = reader.textOrNull()
+                "releasedate", "releaseDate", "release_date" -> year = reader.textOrNull()
+                "rating" -> rating = reader.textOrNull()
+                "duration", "episode_run_time" -> duration = reader.textOrNull()
+                "backdrop_path", "backdrop" -> backdrop = reader.firstTextOrNull()
+                "movie_image", "cover", "cover_big" -> {
+                    val value = reader.textOrNull()
+
+                    if (poster == null) poster = value
+                }
+                else -> reader.skipValue()
+            }
+        }
+
+        reader.endObject()
+
+        fun clean(value: String?) = value?.trim()?.takeIf { it.isNotEmpty() }
+
+        return MediaInfo(
+            plot = clean(plot),
+            cast = clean(cast),
+            director = clean(director),
+            genre = clean(genre),
+            year = clean(year)?.take(4)?.takeIf { text -> text.all { it.isDigit() } },
+            rating = clean(rating)?.takeIf { it != "0" },
+            duration = clean(duration),
+            backdrop = clean(backdrop),
+            poster = clean(poster),
+        )
+    }
+
+    private fun readInfoRoot(reader: JsonReader): MediaInfo {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+            reader.skipValue()
+            return MediaInfo.EMPTY
+        }
+
+        var info = MediaInfo.EMPTY
+
+        reader.beginObject()
+
+        while (reader.hasNext()) {
+            if (reader.nextName() == "info") {
+                info = readInfoBlock(reader)
+            } else {
+                reader.skipValue()
+            }
+        }
+
+        reader.endObject()
+
+        return info
+    }
+
+    private fun readSeriesRoot(reader: JsonReader): SeriesInfo {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+            reader.skipValue()
+            return SeriesInfo(MediaInfo.EMPTY, emptyMap())
+        }
+
+        var info = MediaInfo.EMPTY
+        var seasons: Map<Int, List<Episode>> = emptyMap()
+
+        reader.beginObject()
+
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "info" -> info = readInfoBlock(reader)
+                "episodes" -> seasons = readEpisodes(reader)
+                else -> reader.skipValue()
+            }
+        }
+
+        reader.endObject()
+
+        return SeriesInfo(info, seasons)
+    }
+
+    // Episodes are grouped by season: an object {"1": [...], "2": [...]} (or a list of lists).
+    private fun readEpisodes(reader: JsonReader): Map<Int, List<Episode>> {
+        val result = TreeMap<Int, MutableList<Episode>>()
+
+        when (reader.peek()) {
+            JsonToken.BEGIN_OBJECT -> {
+                reader.beginObject()
+
+                while (reader.hasNext()) {
+                    val season = reader.nextName().toIntOrNull() ?: 0
+                    val list = readArray(reader) { item -> readEpisode(item, season) }
+
+                    result.getOrPut(season) { ArrayList() }.addAll(list)
+                }
+
+                reader.endObject()
+            }
+            JsonToken.BEGIN_ARRAY -> {
+                reader.beginArray()
+
+                var season = 1
+
+                while (reader.hasNext()) {
+                    val current = season
+                    val list = readArray(reader) { item -> readEpisode(item, current) }
+
+                    if (list.isNotEmpty()) result.getOrPut(current) { ArrayList() }.addAll(list)
+
+                    season += 1
+                }
+
+                reader.endArray()
+            }
+            else -> reader.skipValue()
+        }
+
+        for (list in result.values) list.sortBy { it.number }
+
+        return result
+    }
+
+    private fun readEpisode(reader: JsonReader, defaultSeason: Int): Episode? {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+            reader.skipValue()
+            return null
+        }
+
+        var id: String? = null
+        var number = 0
+        var title: String? = null
+        var ext: String? = null
+        var season = defaultSeason
+        var duration: String? = null
+        var seconds = 0L
+        var plot: String? = null
+        var image: String? = null
+
+        reader.beginObject()
+
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "id" -> id = reader.textOrNull()
+                "episode_num" -> number = reader.textOrNull()?.toIntOrNull() ?: 0
+                "title" -> title = reader.textOrNull()
+                "container_extension" -> ext = reader.textOrNull()
+                "season" -> season = reader.textOrNull()?.toIntOrNull() ?: defaultSeason
+                "info" -> {
+                    if (reader.peek() == JsonToken.BEGIN_OBJECT) {
+                        reader.beginObject()
+
+                        while (reader.hasNext()) {
+                            when (reader.nextName()) {
+                                "duration" -> duration = reader.textOrNull()
+                                "duration_secs" -> seconds = reader.textOrNull()?.toLongOrNull() ?: 0L
+                                "plot" -> plot = reader.textOrNull()
+                                "movie_image" -> image = reader.textOrNull()
+                                else -> reader.skipValue()
+                            }
+                        }
+
+                        reader.endObject()
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                else -> reader.skipValue()
+            }
+        }
+
+        reader.endObject()
+
+        val safeId = id ?: return null
+        val label = title?.trim()
+
+        return Episode(
+            id = safeId,
+            season = season,
+            number = number,
+            title = if (label.isNullOrEmpty()) "S$season E$number" else label,
+            ext = ext?.takeIf { it.isNotBlank() } ?: "mkv",
+            duration = duration?.takeIf { it.isNotBlank() },
+            durationSeconds = seconds,
+            plot = plot?.trim()?.takeIf { it.isNotEmpty() },
+            image = image?.takeIf { it.isNotBlank() },
         )
     }
 

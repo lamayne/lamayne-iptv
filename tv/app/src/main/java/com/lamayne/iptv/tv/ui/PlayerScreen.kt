@@ -43,20 +43,18 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
-import androidx.media3.datasource.DefaultHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
+import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.data.Channel
 import com.lamayne.iptv.tv.data.EpgInfo
 import kotlinx.coroutines.delay
@@ -65,10 +63,8 @@ import kotlinx.coroutines.delay
 //  - any key shows the controls, which hide by themselves after a few seconds;
 //  - up/down (or CH+/CH-) change channel inside the list it was started from;
 //  - Back hides the controls, then leaves the player.
-// The format of the picture and the sound is shown in the controls: it tells at
-// once when a codec is not supported by the TV.
 @Composable
-fun PlayerScreen(
+fun LivePlayerScreen(
     channel: Channel,
     urls: List<String>,
     epg: EpgInfo?,
@@ -87,18 +83,7 @@ fun PlayerScreen(
     val currentUrls by rememberUpdatedState(urls)
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
-
-    val exoPlayer = remember {
-        val dataSource = DefaultHttpDataSource.Factory()
-            .setUserAgent("LAMAYNE-TV/0.1")
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(20_000)
-
-        ExoPlayer.Builder(context)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
-            .build()
-    }
+    val exoPlayer = remember { createPlayer(context) }
 
     fun reveal() {
         overlay = true
@@ -301,7 +286,7 @@ fun PlayerScreen(
                     if (next != null) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Next  ${formatClock(next.start)}   ${next.title}",
+                            stringResource(R.string.live_next) + "  ${formatClock(next.start)}   ${next.title}",
                             color = Color(0xFFB8B8CC),
                             fontSize = 16.sp,
                             maxLines = 1,
@@ -329,7 +314,7 @@ fun PlayerScreen(
                         if (paused) {
                             Icon(
                                 Icons.Filled.PlayArrow,
-                                contentDescription = "Play",
+                                contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(40.dp),
                             )
@@ -345,7 +330,7 @@ fun PlayerScreen(
                     RoundButton(onClick = { onToggleFavorite() }) {
                         Icon(
                             if (favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            contentDescription = "Favourite",
+                            contentDescription = null,
                             tint = if (favorite) Accent else Color.White,
                             modifier = Modifier.size(30.dp),
                         )
@@ -354,7 +339,7 @@ fun PlayerScreen(
                     Spacer(Modifier.weight(1f))
 
                     Text(
-                        "Up / Down: change channel     Back: close",
+                        stringResource(R.string.player_hint_live),
                         color = Color(0xFFB8B8CC),
                         fontSize = 14.sp,
                     )
@@ -371,40 +356,17 @@ fun PlayerScreen(
                     .padding(horizontal = 36.dp, vertical = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("This channel cannot be played", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.player_cannot_play),
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
                 Spacer(Modifier.height(8.dp))
                 Text(message, color = Danger, fontSize = 15.sp)
                 Spacer(Modifier.height(10.dp))
-                Text("Press Up or Down to try another channel, Back to return.", color = Muted, fontSize = 15.sp)
+                Text(stringResource(R.string.player_try_other), color = Muted, fontSize = 15.sp)
             }
         }
     }
-}
-
-private fun describeTracks(tracks: Tracks): String {
-    val parts = ArrayList<String>()
-    val otherAudio = ArrayList<String>()
-
-    for (group in tracks.groups) {
-        if (group.length == 0) continue
-
-        val format = group.getTrackFormat(0)
-        val mime = format.sampleMimeType ?: "?"
-
-        if (group.type == C.TRACK_TYPE_VIDEO && group.isSelected) {
-            parts.add("Video $mime ${format.width}x${format.height}")
-        } else if (group.type == C.TRACK_TYPE_AUDIO) {
-            if (group.isSelected) {
-                parts.add("Audio $mime ${format.channelCount}ch")
-            } else {
-                otherAudio.add(mime)
-            }
-        }
-    }
-
-    if (otherAudio.isNotEmpty()) {
-        parts.add("Other audio tracks: " + otherAudio.joinToString())
-    }
-
-    return parts.joinToString("   |   ")
 }

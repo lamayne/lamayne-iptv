@@ -25,65 +25,71 @@ class CredentialStore(context: Context) {
             .apply()
     }
 
-    // Signing out forgets the account but keeps favourites and recent channels.
+    // Signing out forgets the account but keeps favourites, history and settings.
     fun clear() {
         prefs.edit().remove("server").remove("user").remove("pass").apply()
     }
 }
 
-// A short list of channels (favourites, recent channels) kept per account.
-class ChannelListStore(
+// A short list (favourites, recent channels, progress...) kept per account.
+class JsonListStore<T>(
     context: Context,
     private val prefix: String,
     private val limit: Int,
+    private val toJson: (T) -> JSONObject,
+    private val fromJson: (JSONObject) -> T?,
 ) {
     private val prefs = context.getSharedPreferences("lamayne_tv", Context.MODE_PRIVATE)
 
     private fun key(account: Credentials) =
         "$prefix${(account.server + "|" + account.user).hashCode()}"
 
-    fun load(account: Credentials): List<Channel> {
+    fun load(account: Credentials): List<T> {
         val raw = prefs.getString(key(account), null) ?: return emptyList()
 
         return try {
             val array = JSONArray(raw)
-            val channels = ArrayList<Channel>()
+            val items = ArrayList<T>()
 
             for (index in 0 until array.length()) {
                 val item = array.optJSONObject(index) ?: continue
-                val id = item.optString("id")
+                val value = fromJson(item) ?: continue
 
-                if (id.isEmpty()) continue
-
-                channels.add(
-                    Channel(
-                        id = id,
-                        name = item.optString("name"),
-                        icon = item.optString("icon").ifEmpty { null },
-                        categoryId = item.optString("cat").ifEmpty { null },
-                    )
-                )
+                items.add(value)
             }
 
-            channels
+            items
         } catch (e: JSONException) {
             emptyList()
         }
     }
 
-    fun save(account: Credentials, channels: List<Channel>) {
+    fun save(account: Credentials, items: List<T>) {
         val array = JSONArray()
 
-        for (channel in channels.take(limit)) {
-            array.put(
-                JSONObject()
-                    .put("id", channel.id)
-                    .put("name", channel.name)
-                    .put("icon", channel.icon ?: "")
-                    .put("cat", channel.categoryId ?: "")
-            )
-        }
+        for (item in items.take(limit)) array.put(toJson(item))
 
         prefs.edit().putString(key(account), array.toString()).apply()
+    }
+}
+
+// Language and hidden categories.
+class SettingsStore(context: Context) {
+    private val prefs = context.getSharedPreferences("lamayne_tv", Context.MODE_PRIVATE)
+
+    var language: String
+        get() = prefs.getString("lang", "system") ?: "system"
+        set(value) {
+            prefs.edit().putString("lang", value).apply()
+        }
+
+    private fun hiddenKey(account: Credentials, kind: MediaKind) =
+        "hidden_${kind.name}_${(account.server + "|" + account.user).hashCode()}"
+
+    fun hidden(account: Credentials, kind: MediaKind): Set<String> =
+        HashSet(prefs.getStringSet(hiddenKey(account, kind), emptySet()) ?: emptySet())
+
+    fun setHidden(account: Credentials, kind: MediaKind, ids: Set<String>) {
+        prefs.edit().putStringSet(hiddenKey(account, kind), HashSet(ids)).apply()
     }
 }

@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -35,11 +36,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lamayne.iptv.tv.MainViewModel
+import com.lamayne.iptv.tv.R
 
 @Composable
 fun LoginScreen(viewModel: MainViewModel) {
-    val busy by viewModel.busy.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
+    val busy by viewModel.loginBusy.collectAsStateWithLifecycle()
+    val error by viewModel.loginError.collectAsStateWithLifecycle()
     var server by rememberSaveable { mutableStateOf("") }
     var user by rememberSaveable { mutableStateOf("") }
     var pass by rememberSaveable { mutableStateOf("") }
@@ -62,7 +64,7 @@ fun LoginScreen(viewModel: MainViewModel) {
             Spacer(Modifier.height(20.dp))
 
             Text(
-                "Connect your IPTV account",
+                stringResource(R.string.login_title),
                 color = TextMain,
                 fontSize = 26.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -70,11 +72,7 @@ fun LoginScreen(viewModel: MainViewModel) {
 
             Spacer(Modifier.height(4.dp))
 
-            Text(
-                "Use the details your provider gave you (Xtream Codes).",
-                color = Muted,
-                fontSize = 15.sp,
-            )
+            Text(stringResource(R.string.login_subtitle), color = Muted, fontSize = 15.sp)
 
             Spacer(Modifier.height(20.dp))
 
@@ -82,7 +80,7 @@ fun LoginScreen(viewModel: MainViewModel) {
                 OutlinedTextField(
                     value = server,
                     onValueChange = { server = it },
-                    label = { Text("Server address, e.g. http://host:8080") },
+                    label = { Text(stringResource(R.string.login_server)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Uri,
@@ -97,7 +95,7 @@ fun LoginScreen(viewModel: MainViewModel) {
                 OutlinedTextField(
                     value = user,
                     onValueChange = { user = it },
-                    label = { Text("Username") },
+                    label = { Text(stringResource(R.string.login_user)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Ascii,
@@ -112,7 +110,7 @@ fun LoginScreen(viewModel: MainViewModel) {
                 OutlinedTextField(
                     value = pass,
                     onValueChange = { pass = it },
-                    label = { Text("Password") },
+                    label = { Text(stringResource(R.string.login_pass)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Ascii,
@@ -127,8 +125,8 @@ fun LoginScreen(viewModel: MainViewModel) {
 
             Spacer(Modifier.height(20.dp))
 
-            error?.let { message ->
-                Text(message, color = Danger, fontSize = 15.sp)
+            error?.let { failure ->
+                Text(failure.errorText(), color = Danger, fontSize = 15.sp)
                 Spacer(Modifier.height(12.dp))
             }
 
@@ -144,7 +142,7 @@ fun LoginScreen(viewModel: MainViewModel) {
             ) {
                 Box(modifier = Modifier.fillMaxWidth().height(56.dp), contentAlignment = Alignment.Center) {
                     Text(
-                        if (busy) "Connecting..." else "Connect",
+                        stringResource(if (busy) R.string.login_connecting else R.string.login_connect),
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
@@ -154,11 +152,7 @@ fun LoginScreen(viewModel: MainViewModel) {
 
             Spacer(Modifier.height(16.dp))
 
-            Text(
-                "Tip: in the Google TV phone app, open the remote and type with your phone keyboard.",
-                color = Muted,
-                fontSize = 13.sp,
-            )
+            Text(stringResource(R.string.login_tip), color = Muted, fontSize = 13.sp)
         }
     }
 }
