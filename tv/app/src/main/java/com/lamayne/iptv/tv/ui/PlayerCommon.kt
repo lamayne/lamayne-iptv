@@ -14,6 +14,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import java.util.Locale
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 
 // Fit keeps the picture as it is, zoom fills the screen by cutting the edges (movies with
 // black bars), stretch fills the screen by deforming the picture.
@@ -57,18 +58,18 @@ fun createPlayer(context: Context, tunneling: Boolean = false): ExoPlayer {
         .setEnableDecoderFallback(true)
         .forceEnableMediaCodecAsynchronousQueueing()
 
-    val player = ExoPlayer.Builder(context, renderers)
-        .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
-        .build()
+    val selector = DefaultTrackSelector(context)
 
     if (tunneling) {
-        player.trackSelectionParameters = player.trackSelectionParameters
-            .buildUpon()
+        selector.parameters = selector.buildUponParameters()
             .setTunnelingEnabled(true)
             .build()
     }
 
-    return player
+    return ExoPlayer.Builder(context, renderers)
+        .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
+        .setTrackSelector(selector)
+        .build()
 }
 
 // "Video video/avc 1920x1080 | Audio audio/ac3 6ch": tells at once when a codec
