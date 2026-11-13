@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,8 +42,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lamayne.iptv.tv.MainViewModel
 import com.lamayne.iptv.tv.R
+import com.lamayne.iptv.tv.data.AccountInfo
+import com.lamayne.iptv.tv.data.CrashLog
 import com.lamayne.iptv.tv.data.MediaKind
 import java.net.URI
+import java.text.DateFormat
+import java.util.Date
 
 private fun Context.findActivity(): Activity? {
     var current: Context? = this
@@ -98,6 +103,12 @@ fun SettingsTab(viewModel: MainViewModel) {
     val qr = remember { Qr.make(NEWS_URL) }
     var message by remember { mutableStateOf<String?>(null) }
     val cleared = stringResource(R.string.settings_cleared)
+    val subscription by viewModel.accountInfo.collectAsStateWithLifecycle()
+    val smooth by viewModel.tunneling.collectAsStateWithLifecycle()
+    var crash by remember { mutableStateOf(CrashLog.read(context)) }
+
+    // The subscription (days left) is asked each time Settings opens.
+    LaunchedEffect(Unit) { viewModel.loadAccountInfo() }
 
     val version = remember {
         try {
@@ -147,6 +158,21 @@ fun SettingsTab(viewModel: MainViewModel) {
         }
 
         item {
+            Group(stringResource(R.string.settings_playback)) {
+                ActionButton(
+                    text = stringResource(R.string.settings_smooth) + ": " +
+                        stringResource(if (smooth) R.string.settings_on else R.string.settings_off),
+                    onClick = { viewModel.toggleTunneling() },
+                    primary = smooth,
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                Text(stringResource(R.string.settings_smooth_hint), color = Muted, fontSize = 14.sp)
+            }
+        }
+
+        item {
             Group(stringResource(R.string.settings_account)) {
                 val account = credentials
                 val host = account?.let {
@@ -162,6 +188,13 @@ fun SettingsTab(viewModel: MainViewModel) {
                     color = TextMain,
                     fontSize = 17.sp,
                 )
+
+                val plan = subscription
+
+                if (plan != null) {
+                    Spacer(Modifier.height(8.dp))
+                    SubscriptionLines(plan)
+                }
 
                 Spacer(Modifier.height(14.dp))
 
@@ -275,6 +308,37 @@ fun SettingsTab(viewModel: MainViewModel) {
         }
 
         item {
+            Group(stringResource(R.string.settings_diagnostics), focusable = true) {
+                val report = crash
+
+                if (report == null) {
+                    Text(stringResource(R.string.settings_crash_none), color = Muted, fontSize = 15.sp)
+                } else {
+                    Text(stringResource(R.string.settings_crash_title), color = Danger, fontSize = 15.sp)
+
+                    Spacer(Modifier.height(6.dp))
+
+                    Text(
+                        report.lines().take(8).joinToString("\n"),
+                        color = Muted,
+                        fontSize = 12.sp,
+                        maxLines = 8,
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
+                    ActionButton(
+                        text = stringResource(R.string.settings_crash_clear),
+                        onClick = {
+                            CrashLog.clear(context)
+                            crash = null
+                        },
+                    )
+                }
+            }
+        }
+
+        item {
             Group(stringResource(R.string.settings_about), focusable = true) {
                 Text(
                     "LAMAYNE IPTV  " + stringResource(R.string.settings_version, version),
@@ -321,3 +385,42 @@ fun SettingsTab(viewModel: MainViewModel) {
 
 // The QR code leads to the Linktree (news, updates and the way to support the project).
 private const val NEWS_URL = "https://linktr.ee/lamayne"
+
+// "Subscription: 23 day(s) left (until 12 Dec 2026)": orange under a week, red when over.
+@Composable
+private fun SubscriptionLines(info: AccountInfo) {
+    val expires = info.expires
+    val now = System.currentTimeMillis() / 1000
+    val dateText = expires?.let { DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it * 1000)) }.orEmpty()
+    val days = expires?.let { Math.ceil((it - now) / 86_400.0).toInt() }
+
+    val text: String
+    val color: Color
+
+    if (expires == null || days == null) {
+        text = stringResource(R.string.account_unlimited)
+        color = Muted
+    } else if (days < 0) {
+        text = stringResource(R.string.account_expired, dateText)
+        color = Danger
+    } else {
+        text = stringResource(R.string.account_days_left, days, dateText)
+        color = if (days <= 7) Color(0xFFFBBF24) else AccentBright
+    }
+
+    Text(text, color = color, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+
+    val max = info.maxConnections
+
+    if (max != null && max > 0) {
+        Text(
+            stringResource(R.string.account_connections, info.activeConnections ?: 0, max),
+            color = Muted,
+            fontSize = 14.sp,
+        )
+    }
+
+    if (info.trial) {
+        Text(stringResource(R.string.account_trial), color = Muted, fontSize = 14.sp)
+    }
+}

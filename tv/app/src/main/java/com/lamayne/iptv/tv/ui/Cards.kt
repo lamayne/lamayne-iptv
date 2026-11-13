@@ -167,6 +167,7 @@ fun PosterCard(
     rating: String? = null,
     focusRequester: FocusRequester? = null,
     onFocused: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     FocusCard(
@@ -175,6 +176,7 @@ fun PosterCard(
         shape = RoundedCornerShape(14.dp),
         focusRequester = focusRequester,
         onFocused = onFocused,
+        onLongClick = onLongClick,
         focusedScale = 1.07f,
     ) {
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {
@@ -300,6 +302,7 @@ fun ChannelTile(
     modifier: Modifier = Modifier,
     nowTitle: String? = null,
     nowProgress: Float? = null,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val label = channelLabel(channel.name)
@@ -309,6 +312,7 @@ fun ChannelTile(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
+        onLongClick = onLongClick,
         focusedScale = 1.06f,
     ) {
         Column {

@@ -60,6 +60,9 @@ fun ChannelRow(
     favorite: Boolean,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
+    // The category the channel belongs to (shown in a search, where it is not obvious).
+    category: String? = null,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     FocusCard(
@@ -70,6 +73,7 @@ fun ChannelRow(
         shape = RoundedCornerShape(14.dp),
         focusedScale = 1.02f,
         focusRequester = focusRequester,
+        onLongClick = onLongClick,
     ) {
         Row(
             modifier = Modifier
@@ -106,6 +110,17 @@ fun ChannelRow(
                             modifier = Modifier
                                 .background(Color(0x338B5CF6), RoundedCornerShape(5.dp))
                                 .padding(horizontal = 6.dp, vertical = 1.dp),
+                        )
+                    }
+
+                    if (category != null) {
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            category,
+                            color = Muted,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -148,6 +163,95 @@ fun ChannelRow(
 
             if (favorite) {
                 Spacer(Modifier.width(14.dp))
+                Icon(
+                    Icons.Filled.Favorite,
+                    contentDescription = null,
+                    tint = Accent,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+// What a list receives from its page: where to put the cursor, whether it shows search
+// results, and how to find the category of an item.
+class BrowseContext<T>(
+    val startIndex: Int,
+    val firstFocus: FocusRequester,
+    val searching: Boolean,
+    val categoryOf: (T) -> String?,
+)
+
+// A search result: small poster, title and the CATEGORY it is in (the same movie often
+// exists in several: 4K, FHD, a language...).
+@Composable
+fun SearchRow(
+    title: String,
+    image: String?,
+    category: String?,
+    rating: String?,
+    favorite: Boolean,
+    focusRequester: FocusRequester?,
+    onLongClick: (() -> Unit)?,
+    onClick: () -> Unit,
+) {
+    FocusCard(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(80.dp),
+        shape = RoundedCornerShape(14.dp),
+        focusedScale = 1.02f,
+        focusRequester = focusRequester,
+        onLongClick = onLongClick,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PosterImage(
+                image,
+                title,
+                Modifier
+                    .size(width = 44.dp, height = 64.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+            )
+
+            Spacer(Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    title,
+                    color = TextMain,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                if (category != null) {
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        category,
+                        color = AccentBright,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            if (rating != null) {
+                Spacer(Modifier.width(12.dp))
+                Text("\u2605 $rating", color = Muted, fontSize = 13.sp)
+            }
+
+            if (favorite) {
+                Spacer(Modifier.width(12.dp))
                 Icon(
                     Icons.Filled.Favorite,
                     contentDescription = null,
@@ -327,12 +431,13 @@ fun <T : Any> BrowsePage(
     favorites: List<T>,
     searchResults: List<T>,
     idOf: (T) -> String,
+    categoryIdOf: (T) -> String?,
     panelTitle: Int,
     countFormat: Int,
     searchHint: Int,
     onSelectCategory: (Category) -> Unit,
     onRetry: () -> Unit,
-    content: @Composable (List<T>, Int, FocusRequester) -> Unit,
+    content: @Composable (List<T>, BrowseContext<T>) -> Unit,
 ) {
     val categories by controller.categories.collectAsStateWithLifecycle()
     val selected by controller.selected.collectAsStateWithLifecycle()
@@ -470,8 +575,18 @@ fun <T : Any> BrowsePage(
                     BrowseMode.CATEGORY -> MessageBlock(stringResource(R.string.browse_empty), "")
                 }
 
-                else -> key(Pair(mode, shown.firstOrNull()?.let(idOf))) {
-                    content(shown, startIndex, firstFocus)
+                else -> {
+                    val names = categories.associate { it.id to it.name.trim() }
+                    val context = BrowseContext<T>(
+                        startIndex = startIndex,
+                        firstFocus = firstFocus,
+                        searching = mode == BrowseMode.SEARCH,
+                        categoryOf = { item -> categoryIdOf(item)?.let { names[it] } },
+                    )
+
+                    key(Pair(mode, shown.firstOrNull()?.let(idOf))) {
+                        content(shown, context)
+                    }
                 }
             }
         }

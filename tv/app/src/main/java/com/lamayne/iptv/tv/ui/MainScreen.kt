@@ -61,7 +61,8 @@ fun MainScreen(viewModel: MainViewModel) {
 
     val goDown: () -> Unit = {
         if (featured.isNotEmpty()) {
-            homeEntry.requestFocus()
+            // never crash if the button is not there yet
+            runCatching { homeEntry.requestFocus() }
         } else {
             focusManager.moveFocus(FocusDirection.Down)
         }

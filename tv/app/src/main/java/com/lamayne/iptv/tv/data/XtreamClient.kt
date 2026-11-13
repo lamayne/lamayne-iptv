@@ -246,6 +246,53 @@ object XtreamClient {
         return first
     }
 
+    suspend fun accountInfo(credentials: Credentials): AccountInfo? =
+        fetch(apiUrl(credentials)) { reader -> readAccount(reader) }
+
+    private fun readAccount(reader: JsonReader): AccountInfo? {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+            reader.skipValue()
+            return null
+        }
+
+        var info: AccountInfo? = null
+
+        reader.beginObject()
+
+        while (reader.hasNext()) {
+            if (reader.nextName() == "user_info" && reader.peek() == JsonToken.BEGIN_OBJECT) {
+                var expires: Long? = null
+                var status: String? = null
+                var trial = false
+                var max: Int? = null
+                var active: Int? = null
+
+                reader.beginObject()
+
+                while (reader.hasNext()) {
+                    when (reader.nextName()) {
+                        "exp_date" -> expires = reader.textOrNull()?.toLongOrNull()
+                        "status" -> status = reader.textOrNull()
+                        "is_trial" -> trial = reader.textOrNull() == "1"
+                        "max_connections" -> max = reader.textOrNull()?.toIntOrNull()
+                        "active_cons" -> active = reader.textOrNull()?.toIntOrNull()
+                        else -> reader.skipValue()
+                    }
+                }
+
+                reader.endObject()
+
+                info = AccountInfo(expires?.takeIf { it > 0 }, status, trial, max, active)
+            } else {
+                reader.skipValue()
+            }
+        }
+
+        reader.endObject()
+
+        return info
+    }
+
     private fun readAuth(reader: JsonReader): Boolean {
         if (reader.peek() != JsonToken.BEGIN_OBJECT) {
             reader.skipValue()

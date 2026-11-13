@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lamayne.iptv.tv.data.BrowseController
+import com.lamayne.iptv.tv.data.AccountInfo
 import com.lamayne.iptv.tv.data.Category
 import com.lamayne.iptv.tv.data.Channel
 import com.lamayne.iptv.tv.data.CredentialStore
@@ -291,6 +292,69 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val actorProgress: StateFlow<ActorProgress> = _actorProgress.asStateFlow()
 
     // Bumped by "update the guide": the channel lists ask for their programmes again.
+    // A short message at the bottom of the screen ("Added to favourites").
+    data class Notice(val name: String, val added: Boolean, val id: Long)
+
+    private val _notice = MutableStateFlow<Notice?>(null)
+    val notice: StateFlow<Notice?> = _notice.asStateFlow()
+    private var noticeJob: Job? = null
+
+    private fun announce(name: String, added: Boolean) {
+        val current = Notice(name, added, System.nanoTime())
+
+        _notice.value = current
+        noticeJob?.cancel()
+        noticeJob = viewModelScope.launch {
+            delay(2_200)
+
+            if (_notice.value?.id == current.id) _notice.value = null
+        }
+    }
+
+    private val _accountInfo = MutableStateFlow<AccountInfo?>(null)
+    val accountInfo: StateFlow<AccountInfo?> = _accountInfo.asStateFlow()
+
+    // The subscription (days left...) is asked when the account block of Settings is shown.
+    fun loadAccountInfo() {
+        val credentials = _credentials.value ?: return
+
+        if (credentials.isM3u) {
+            _accountInfo.value = null
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _accountInfo.value = XtreamClient.accountInfo(credentials)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // the previous answer stays
+            }
+        }
+    }
+
+    private val _aspect = MutableStateFlow(settings.aspect)
+    val aspect: StateFlow<Int> = _aspect.asStateFlow()
+
+    // Fit -> zoom -> stretch -> fit...
+    fun cycleAspect() {
+        val next = (_aspect.value + 1) % 3
+
+        _aspect.value = next
+        settings.aspect = next
+    }
+
+    private val _tunneling = MutableStateFlow(settings.tunneling)
+    val tunneling: StateFlow<Boolean> = _tunneling.asStateFlow()
+
+    fun toggleTunneling() {
+        val next = !_tunneling.value
+
+        _tunneling.value = next
+        settings.tunneling = next
+    }
+
     private val _epgVersion = MutableStateFlow(0)
     val epgVersion: StateFlow<Int> = _epgVersion.asStateFlow()
 
@@ -567,16 +631,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         push(Route.MovieDetails(movie))
         loadMovieInfo(movie)
 
-        // The movie list is prepared in the background: the page of an actor then opens fast.
-        viewModelScope.launch {
-            try {
-                ensureIndex(MediaKind.MOVIE)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // not needed now
-            }
-        }
     }
 
     fun openSeries(series: Series) {
@@ -830,6 +884,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _favChannels.value = updated
         favChannelStore.save(credentials, updated)
+        announce(channelName(channel.name), updated.any { it.id == channel.id })
     }
 
     fun toggleFavorite(movie: Movie) {
@@ -841,6 +896,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _favMovies.value = updated
         favMovieStore.save(credentials, updated)
+        announce(movie.name, updated.any { it.id == movie.id })
     }
 
     fun toggleFavorite(series: Series) {
@@ -852,6 +908,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _favSeries.value = updated
         favSeriesStore.save(credentials, updated)
+        announce(series.name, updated.any { it.id == series.id })
     }
 
     fun clearProgress() {
@@ -891,6 +948,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _playingEpg.value = null
         playingEpgJob?.cancel()
         playingEpgJob = viewModelScope.launch {
+            // What the list already knew is shown at once; the rest waits for the picture to start.
+            epgCache[channel.id]?.let { _playingEpg.value = EpgInfo.from(it.second, System.currentTimeMillis() / 1000) }
+            delay(2_500)
+
             while (isActive) {
                 _playingEpg.value = fetchEpg(channel)
                 delay(60_000)

@@ -36,6 +36,9 @@ import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.BlendMode
@@ -89,8 +92,23 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
     var index by remember { mutableStateOf(0) }
     var heroFocused by remember { mutableStateOf(false) }
     var focusedOnce by remember { mutableStateOf(false) }
-    val count = featured.size
-    val slide = if (count > 0) featured[index % count] else null
+    // A title that is already in "Continue watching" is not put forward again: seeing the
+    // same film twice (big picture and a resume card) was confusing.
+    val startedMovies = remember(continueItems) {
+        continueItems.filter { it.kind == MediaKind.MOVIE }.map { it.id }.toSet()
+    }
+    val startedSeries = remember(continueItems) { continueItems.mapNotNull { it.seriesId }.toSet() }
+    val fresh = remember(featured, startedMovies, startedSeries) {
+        featured.filter { f ->
+            val movieId = f.movie?.id
+            val seriesId = f.series?.id
+
+            !(movieId != null && movieId in startedMovies) && !(seriesId != null && seriesId in startedSeries)
+        }
+    }
+    val slides = fresh.ifEmpty { featured }
+    val count = slides.size
+    val slide = if (count > 0) slides[index % count] else null
 
     // The favourite channels show what is on now.
     LaunchedEffect(favChannels, epgVersion) {
@@ -115,6 +133,14 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         HomeBackdrop(slide?.backdrop)
+
+        // Behind the texts of the banner: the title stays readable whatever the picture.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.62f)
+                .height(300.dp)
+                .background(Brush.horizontalGradient(listOf(Color(0xD90A0A12), Color.Transparent))),
+        )
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -172,6 +198,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                             modifier = Modifier.width(128.dp),
                             nowTitle = now?.title,
                             nowProgress = now?.progress(System.currentTimeMillis() / 1000),
+                            onLongClick = { viewModel.toggleFavorite(channel) },
                             onClick = { viewModel.playLive(channel, favChannels) },
                         )
                     }
@@ -186,6 +213,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                             image = movie.poster,
                             modifier = Modifier.width(112.dp),
                             rating = ratingText(movie.rating),
+                            onLongClick = { viewModel.toggleFavorite(movie) },
                             onClick = { viewModel.openMovie(movie) },
                         )
                     }
@@ -200,6 +228,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                             image = series.poster,
                             modifier = Modifier.width(112.dp),
                             rating = ratingText(series.rating),
+                            onLongClick = { viewModel.toggleFavorite(series) },
                             onClick = { viewModel.openSeries(series) },
                         )
                     }
@@ -214,6 +243,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                             image = movie.poster,
                             modifier = Modifier.width(112.dp),
                             rating = ratingText(movie.rating),
+                            onLongClick = { viewModel.toggleFavorite(movie) },
                             onClick = { viewModel.openMovie(movie) },
                         )
                     }
@@ -228,6 +258,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                             image = series.poster,
                             modifier = Modifier.width(112.dp),
                             rating = ratingText(series.rating),
+                            onLongClick = { viewModel.toggleFavorite(series) },
                             onClick = { viewModel.openSeries(series) },
                         )
                     }
@@ -282,8 +313,8 @@ private fun HomeBackdrop(url: String?) {
                     brush = Brush.verticalGradient(
                         0f to Color.Transparent,
                         0.16f to Color.Black,
-                        0.42f to Color.Black,
-                        0.9f to Color.Transparent,
+                        0.3f to Color.Black,
+                        0.68f to Color.Transparent,
                     ),
                     blendMode = BlendMode.DstIn,
                 )
@@ -365,11 +396,13 @@ private fun HeroBlock(
                     .width(500.dp),
             ) {
                 // Only the texts change between two banners: the button keeps the cursor.
-                Crossfade(targetState = slide, animationSpec = tween(500), label = "heroText") { shown ->
+                run {
+                    val shown: Featured = slide
+
                     Column {
                         Text(
                             stringResource(
-                                if (shown.kind == MediaKind.MOVIE) R.string.kind_movie else R.string.kind_series
+                                if (shown.kind == MediaKind.MOVIE) R.string.hero_new_movie else R.string.hero_new_series
                             ).uppercase(),
                             color = AccentBright,
                             fontSize = 12.sp,
@@ -382,6 +415,9 @@ private fun HeroBlock(
                         Text(
                             displayName(shown.title),
                             color = Color.White,
+                            style = TextStyle(
+                                shadow = Shadow(color = Color(0xCC000000), offset = Offset(0f, 3f), blurRadius = 12f),
+                            ),
                             fontSize = 36.sp,
                             fontWeight = FontWeight.Bold,
                             lineHeight = 40.sp,

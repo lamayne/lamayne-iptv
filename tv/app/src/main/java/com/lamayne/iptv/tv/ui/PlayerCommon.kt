@@ -1,6 +1,11 @@
 package com.lamayne.iptv.tv.ui
 
 import android.content.Context
+import com.lamayne.iptv.tv.R
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.compose.ui.res.stringResource
+import androidx.compose.runtime.Composable
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.TrackSelectionOverride
@@ -10,16 +15,60 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import java.util.Locale
 
-fun createPlayer(context: Context): ExoPlayer {
+// Fit keeps the picture as it is, zoom fills the screen by cutting the edges (movies with
+// black bars), stretch fills the screen by deforming the picture.
+fun resizeModeOf(aspect: Int): Int =
+    when (aspect) {
+        1 -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+        2 -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+        else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+    }
+
+@Composable
+fun aspectShort(aspect: Int): String =
+    stringResource(
+        when (aspect) {
+            1 -> R.string.aspect_zoom_short
+            2 -> R.string.aspect_stretch_short
+            else -> R.string.aspect_fit_short
+        }
+    )
+
+@Composable
+fun aspectLong(aspect: Int): String =
+    stringResource(
+        when (aspect) {
+            1 -> R.string.aspect_zoom
+            2 -> R.string.aspect_stretch
+            else -> R.string.aspect_fit
+        }
+    )
+
+fun createPlayer(context: Context, tunneling: Boolean = false): ExoPlayer {
     val dataSource = DefaultHttpDataSource.Factory()
         .setUserAgent("LAMAYNE-TV/0.4")
         .setAllowCrossProtocolRedirects(true)
         .setConnectTimeoutMs(15_000)
         .setReadTimeoutMs(25_000)
 
-    return ExoPlayer.Builder(context)
+    // Another decoder is tried when the first one fails, and the decoder is fed from a
+    // separate thread (fewer dropped frames on heavy pictures).
+    val renderers = DefaultRenderersFactory(context)
+        .setEnableDecoderFallback(true)
+        .forceEnableMediaCodecAsynchronousQueueing()
+
+    val player = ExoPlayer.Builder(context, renderers)
         .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
         .build()
+
+    if (tunneling) {
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .setTunnelingEnabled(true)
+            .build()
+    }
+
+    return player
 }
 
 // "Video video/avc 1920x1080 | Audio audio/ac3 6ch": tells at once when a codec

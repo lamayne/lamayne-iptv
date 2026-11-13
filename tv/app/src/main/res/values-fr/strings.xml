@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LAMAYNE IPTV</string>
+    <string name="account_connections">Connexions utilisées : %1$d sur %2$d</string>
+    <string name="account_days_left">Abonnement : %1$d jour(s) restant(s) (jusqu’au %2$s)</string>
+    <string name="account_expired">Abonnement expiré le %1$s</string>
+    <string name="account_trial">Compte d’essai</string>
+    <string name="account_unlimited">Abonnement : pas de date d’expiration</string>
     <string name="actor_elapsed">%1$d s</string>
     <string name="actor_loading_hint">Ça travaille. Retour pour annuler.</string>
     <string name="actor_none">Aucun film trouvé</string>
@@ -20,6 +25,12 @@
     <string name="actor_summary">%1$d films sur %2$d sont dans votre catalogue</string>
     <string name="actor_title">Films avec %1$s</string>
     <string name="actor_unavailable">Filmographie indisponible</string>
+    <string name="aspect_fit">Ajusté</string>
+    <string name="aspect_fit_short">AJUST.</string>
+    <string name="aspect_stretch">Étiré (remplit, déforme)</string>
+    <string name="aspect_stretch_short">ÉTIRÉ</string>
+    <string name="aspect_zoom">Zoom (remplit, coupe les bords)</string>
+    <string name="aspect_zoom_short">ZOOM</string>
     <string name="browse_empty">Rien dans cette catégorie</string>
     <string name="browse_favorites">Favoris</string>
     <string name="browse_search">Recherche</string>
@@ -43,12 +54,16 @@
     <string name="err_server_not_found">Serveur introuvable. Vérifiez l\'adresse et la connexion internet.</string>
     <string name="err_timeout">Le serveur met trop de temps à répondre. Réessayez.</string>
     <string name="error_load_title">Impossible de charger le contenu</string>
-    <string name="fav_empty_hint">Sélectionnez le cœur sur une chaîne, un film ou une série pour le garder ici.</string>
+    <string name="fav_added">Ajouté aux favoris : %1$s</string>
+    <string name="fav_empty_hint">Maintenez OK sur une chaîne, un film ou une série (ou utilisez le cœur sur sa fiche) pour la garder ici.</string>
     <string name="fav_empty_title">Aucun favori pour le moment</string>
+    <string name="fav_removed">Retiré des favoris : %1$s</string>
     <string name="guide_empty">Pas d’information de programme</string>
     <string name="guide_left">Encore %1$d min</string>
     <string name="guide_next">Ensuite</string>
     <string name="guide_now">En ce moment</string>
+    <string name="hero_new_movie">NOUVEAU FILM</string>
+    <string name="hero_new_series">NOUVELLE SÉRIE</string>
     <string name="home_continue">Reprendre la lecture</string>
     <string name="home_latest_movies">Derniers films</string>
     <string name="home_latest_series">Dernières séries</string>
@@ -56,9 +71,6 @@
     <string name="home_my_movies">Mes films</string>
     <string name="home_my_series">Mes séries</string>
     <string name="home_nothing">Rien à afficher pour le moment. Ouvrez la TV en direct, les films ou les séries pour commencer.</string>
-    <string name="home_preparing">Préparation de vos recommandations…</string>
-    <string name="kind_movie">Film</string>
-    <string name="kind_series">Série</string>
     <string name="live_categories">Catégories Live TV</string>
     <string name="live_count">%1$d chaînes</string>
     <string name="live_no_guide">Pas d\'information de programme</string>
@@ -90,6 +102,8 @@
     <string name="player_cannot_play">Cette chaîne ne peut pas être lue</string>
     <string name="player_cannot_play_vod">Cette vidéo ne peut pas être lue</string>
     <string name="player_close">Fermer</string>
+    <string name="player_dropped">Images perdues : %1$d</string>
+    <string name="player_frame">Cadre</string>
     <string name="player_hint_live">Haut / Bas : changer de chaîne     Retour : fermer</string>
     <string name="player_hint_vod">Gauche / Droite : 10 s     Retour : fermer</string>
     <string name="player_no_audio">Aucune autre piste audio dans cette vidéo.</string>
@@ -113,11 +127,18 @@
     <string name="settings_account_as">Connecté en tant que %1$s sur %2$s</string>
     <string name="settings_clear_history">Effacer l\'historique de lecture</string>
     <string name="settings_cleared">Fait.</string>
+    <string name="settings_crash_clear">Effacer</string>
+    <string name="settings_crash_none">Aucun plantage enregistré.</string>
+    <string name="settings_crash_title">L’application s’est fermée toute seule la dernière fois :</string>
     <string name="settings_data">Données</string>
+    <string name="settings_diagnostics">Diagnostic</string>
     <string name="settings_disclaimer">LAMAYNE IPTV est un lecteur : il ne fournit aucun contenu. N\'utilisez que des sources que vous avez le droit d\'utiliser.</string>
     <string name="settings_language">Langue</string>
     <string name="settings_language_auto">Automatique</string>
     <string name="settings_language_hint">Les films et séries proposés sur l’accueil suivent cette langue.</string>
+    <string name="settings_off">Désactivé</string>
+    <string name="settings_on">Activé</string>
+    <string name="settings_playback">Lecture</string>
     <string name="settings_refresh">Mise à jour</string>
     <string name="settings_refresh_all">Tout mettre à jour</string>
     <string name="settings_refresh_guide">Guide</string>
@@ -127,6 +148,8 @@
     <string name="settings_refresh_series">Séries</string>
     <string name="settings_refreshed">Mise à jour… les listes se rechargent quand vous les ouvrez.</string>
     <string name="settings_sign_out">Se déconnecter</string>
+    <string name="settings_smooth">Mode fluide</string>
+    <string name="settings_smooth_hint">Lecture synchronisée par le matériel : plus fluide pour les images lourdes (4K). Si le son est décalé, désactivez-le.</string>
     <string name="settings_support">Soutien et actualités</string>
     <string name="settings_support_text">Scannez le code avec votre téléphone : actualités, mises à jour et moyen de soutenir le projet.</string>
     <string name="settings_version">version %1$s</string>

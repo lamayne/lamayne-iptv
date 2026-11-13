@@ -83,6 +83,20 @@ class SettingsStore(context: Context) {
             prefs.edit().putString("lang", value).apply()
         }
 
+    // 0 = fit, 1 = zoom (fills the screen, crops the edges), 2 = stretch
+    var aspect: Int
+        get() = prefs.getInt("aspect", 0)
+        set(value) {
+            prefs.edit().putInt("aspect", value).apply()
+        }
+
+    // Hardware-synchronised playback: smoother for heavy (4K) pictures on most TVs.
+    var tunneling: Boolean
+        get() = prefs.getBoolean("tunneling", true)
+        set(value) {
+            prefs.edit().putBoolean("tunneling", value).apply()
+        }
+
     private fun hiddenKey(account: Credentials, kind: MediaKind) =
         "hidden_${kind.name}_${(account.server + "|" + account.user).hashCode()}"
 

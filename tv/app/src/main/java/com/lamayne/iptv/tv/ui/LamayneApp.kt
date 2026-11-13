@@ -3,6 +3,9 @@ package com.lamayne.iptv.tv.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -31,6 +34,10 @@ fun LamayneApp(viewModel: MainViewModel) {
     val favChannels by viewModel.favChannels.collectAsStateWithLifecycle()
     val favMovies by viewModel.favMovies.collectAsStateWithLifecycle()
     val favSeries by viewModel.favSeries.collectAsStateWithLifecycle()
+    val aspect by viewModel.aspect.collectAsStateWithLifecycle()
+    val tunneling by viewModel.tunneling.collectAsStateWithLifecycle()
+    val notice by viewModel.notice.collectAsStateWithLifecycle()
+    var lastNotice by remember { mutableStateOf<MainViewModel.Notice?>(null) }
     val account = credentials
     val channel = playing
     val route = stack.lastOrNull()
@@ -69,6 +76,8 @@ fun LamayneApp(viewModel: MainViewModel) {
                     favorite = favChannels.any { it.id == channel.id },
                     onToggleFavorite = { viewModel.toggleFavorite(channel) },
                     onZap = { delta -> viewModel.zap(delta) },
+                    aspect = aspect,
+                    onCycleAspect = { viewModel.cycleAspect() },
                     onBack = { viewModel.stopLive() },
                 )
             }
@@ -88,6 +97,9 @@ fun LamayneApp(viewModel: MainViewModel) {
                     VodPlayerScreen(
                         request = request,
                         url = url,
+                        aspect = aspect,
+                        onCycleAspect = { viewModel.cycleAspect() },
+                        tunneling = tunneling,
                         favorite = favorite,
                         onToggleFavorite = {
                             if (request.kind == MediaKind.EPISODE) {
@@ -121,6 +133,21 @@ fun LamayneApp(viewModel: MainViewModel) {
             route is Route.Actor -> ActorScreen(viewModel, route.name)
 
             else -> MainScreen(viewModel)
+        }
+
+        LaunchedEffect(notice) {
+            notice?.let { lastNotice = it }
+        }
+
+        AnimatedVisibility(
+            visible = notice != null,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 40.dp),
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(400)),
+        ) {
+            lastNotice?.let { NoticePill(it) }
         }
 
         AnimatedVisibility(visible = showSplash, exit = fadeOut(tween(700))) {

@@ -73,6 +73,8 @@ fun LivePlayerScreen(
     favorite: Boolean,
     onToggleFavorite: () -> Unit,
     onZap: (Int) -> Unit,
+    aspect: Int,
+    onCycleAspect: () -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -207,6 +209,7 @@ fun LivePlayerScreen(
     ) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
+            update = { view -> view.resizeMode = resizeModeOf(aspect) },
             factory = { viewContext ->
                 PlayerView(viewContext).apply {
                     useController = false
@@ -335,6 +338,10 @@ fun LivePlayerScreen(
                             tint = if (favorite) Accent else Color.White,
                             modifier = Modifier.size(22.dp),
                         )
+                    }
+
+                    RoundButton(onClick = onCycleAspect, size = 46.dp) {
+                        Text(aspectShort(aspect), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 

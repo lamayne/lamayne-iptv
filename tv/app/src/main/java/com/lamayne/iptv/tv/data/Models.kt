@@ -185,3 +185,12 @@ sealed interface UiError {
     data class Http(val code: Int) : UiError
     data class Other(val text: String?) : UiError
 }
+
+// What the provider says about the subscription (player_api.php, "user_info").
+data class AccountInfo(
+    val expires: Long?,          // unix seconds; null = no expiry date
+    val status: String?,
+    val trial: Boolean,
+    val maxConnections: Int?,
+    val activeConnections: Int?,
+)

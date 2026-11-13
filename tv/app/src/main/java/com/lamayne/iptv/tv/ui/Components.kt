@@ -28,6 +28,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -62,9 +67,12 @@ fun FocusCard(
     focusedScale: Float = 1.05f,
     focusRequester: FocusRequester? = null,
     onFocused: () -> Unit = {},
+    // Held OK on the remote: used to add / remove a favourite from a list.
+    onLongClick: (() -> Unit)? = null,
     content: @Composable BoxScope.(Boolean) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val longFired = remember { BooleanArray(1) }
     val scale by animateFloatAsState(if (focused) focusedScale else 1f, label = "focusScale")
     val border by animateColorAsState(
         if (focused) borderColor else Color.Transparent,
@@ -91,10 +99,30 @@ fun FocusCard(
 
                 if (state.isFocused) onFocused()
             }
+            .onPreviewKeyEvent { event ->
+                val isOk = event.key == Key.DirectionCenter || event.key == Key.Enter
+
+                if (event.type != KeyEventType.KeyDown || !isOk) {
+                    false
+                } else if (event.nativeKeyEvent.repeatCount == 0) {
+                    longFired[0] = false
+                    false
+                } else if (onLongClick != null && event.nativeKeyEvent.repeatCount == 1) {
+                    // the first repeat of a held key = a long press
+                    longFired[0] = true
+                    onLongClick()
+                    true
+                } else {
+                    false
+                }
+            }
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-                onClick = onClick,
+                onClick = {
+                    // after a long press, the release must not also count as a click
+                    if (longFired[0]) longFired[0] = false else onClick()
+                },
             ),
     ) {
         content(focused)

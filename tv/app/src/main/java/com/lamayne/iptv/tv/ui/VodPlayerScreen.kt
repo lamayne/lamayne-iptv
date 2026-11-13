@@ -59,6 +59,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.ui.PlayerView
 import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.data.MediaKind
@@ -78,6 +79,9 @@ fun VodPlayerScreen(
     url: String,
     favorite: Boolean,
     onToggleFavorite: () -> Unit,
+    aspect: Int,
+    onCycleAspect: () -> Unit,
+    tunneling: Boolean,
     onProgress: (Long, Long) -> Unit,
     onEnded: () -> Unit,
     onNext: () -> Unit,
@@ -96,11 +100,12 @@ fun VodPlayerScreen(
     var picker by remember { mutableStateOf(0) }
     var previousPicker by remember { mutableStateOf(0) }
     var buffering by remember { mutableStateOf(true) }
+    var dropped by remember { mutableStateOf(0) }
     val audioFocus = remember { FocusRequester() }
     val subFocus = remember { FocusRequester() }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
-    val exoPlayer = remember { createPlayer(context) }
+    val exoPlayer = remember { createPlayer(context, tunneling) }
     val isEpisode = request.kind == MediaKind.EPISODE
     val audioOptions = remember(tracks) { trackOptions(tracks, C.TRACK_TYPE_AUDIO) }
     val textOptions = remember(tracks) { trackOptions(tracks, C.TRACK_TYPE_TEXT) }
@@ -159,7 +164,17 @@ fun VodPlayerScreen(
 
         exoPlayer.addListener(listener)
 
+        // Frames the TV could not show in time: tells a heavy picture from a slow network.
+        val analytics = object : AnalyticsListener {
+            override fun onDroppedVideoFrames(eventTime: AnalyticsListener.EventTime, droppedFrames: Int, elapsedMs: Long) {
+                dropped += droppedFrames
+            }
+        }
+
+        exoPlayer.addAnalyticsListener(analytics)
+
         onDispose {
+            exoPlayer.removeAnalyticsListener(analytics)
             val total = exoPlayer.duration
 
             // Where we stopped is remembered, even when leaving with Back.
@@ -287,6 +302,7 @@ fun VodPlayerScreen(
     ) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
+            update = { view -> view.resizeMode = resizeModeOf(aspect) },
             factory = { viewContext ->
                 PlayerView(viewContext).apply {
                     useController = false
@@ -325,9 +341,15 @@ fun VodPlayerScreen(
                     Text(request.subtitle, color = Color(0xFFCFCFE0), fontSize = 16.sp, maxLines = 1)
                 }
 
-                if (info.isNotEmpty()) {
+                val infoLine = if (dropped > 0) {
+                    info + "   |   " + stringResource(R.string.player_dropped, dropped)
+                } else {
+                    info
+                }
+
+                if (infoLine.isNotEmpty()) {
                     Spacer(Modifier.height(4.dp))
-                    Text(info, color = Color(0xFF9A9AB2), fontSize = 13.sp, maxLines = 1)
+                    Text(infoLine, color = Color(0xFF9A9AB2), fontSize = 13.sp, maxLines = 1)
                 }
             }
 
@@ -401,6 +423,11 @@ fun VodPlayerScreen(
                         text = stringResource(R.string.player_subtitles) + "  " + textOptions.size,
                         onClick = { picker = 2 },
                         focusRequester = subFocus,
+                    )
+
+                    ActionButton(
+                        text = stringResource(R.string.player_frame) + ": " + aspectLong(aspect),
+                        onClick = onCycleAspect,
                     )
 
                     RoundButton(onClick = { onToggleFavorite() }) {

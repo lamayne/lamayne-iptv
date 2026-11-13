@@ -35,13 +35,14 @@ fun LiveTab(viewModel: MainViewModel) {
         favorites = favorites,
         searchResults = results,
         idOf = { it.id },
+        categoryIdOf = { it.categoryId },
         panelTitle = R.string.live_categories,
         countFormat = R.string.live_count,
         searchHint = R.string.search_hint_live,
         onSelectCategory = { viewModel.selectLiveCategory(it) },
         onRetry = { viewModel.retry(Tab.LIVE) },
-    ) { list, startIndex, firstFocus ->
-        val listState = rememberLazyListState(initialFirstVisibleItemIndex = startIndex)
+    ) { list, ctx ->
+        val listState = rememberLazyListState(initialFirstVisibleItemIndex = ctx.startIndex)
 
         LazyColumn(
             state = listState,
@@ -57,7 +58,9 @@ fun LiveTab(viewModel: MainViewModel) {
                     channel = channel,
                     epg = epgMap[channel.id],
                     favorite = favoriteIds.contains(channel.id),
-                    focusRequester = if (index == startIndex) firstFocus else null,
+                    focusRequester = if (index == ctx.startIndex) ctx.firstFocus else null,
+                    category = if (ctx.searching) ctx.categoryOf(channel) else null,
+                    onLongClick = { viewModel.toggleFavorite(channel) },
                     onClick = { viewModel.playLive(channel, list) },
                 )
             }
