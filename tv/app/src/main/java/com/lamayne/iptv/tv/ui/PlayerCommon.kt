@@ -15,6 +15,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import java.util.Locale
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 
 // Fit keeps the picture as it is, zoom fills the screen by cutting the edges (movies with
 // black bars), stretch fills the screen by deforming the picture.

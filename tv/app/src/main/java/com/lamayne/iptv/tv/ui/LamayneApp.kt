@@ -25,6 +25,7 @@ import com.lamayne.iptv.tv.data.MediaKind
 import com.lamayne.iptv.tv.data.Movie
 import com.lamayne.iptv.tv.data.Series
 import com.lamayne.iptv.tv.data.XtreamClient
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun LamayneApp(viewModel: MainViewModel) {
