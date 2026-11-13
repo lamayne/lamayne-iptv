@@ -103,12 +103,10 @@
     <string name="player_cannot_play_vod">Cette vidéo ne peut pas être lue</string>
     <string name="player_close">Fermer</string>
     <string name="player_dropped">Images perdues : %1$d</string>
-    <string name="player_frame">Cadre</string>
-    <string name="player_hint_live">Haut / Bas : changer de chaîne     Retour : fermer</string>
-    <string name="player_hint_vod">Gauche / Droite : 10 s     Retour : fermer</string>
     <string name="player_no_audio">Aucune autre piste audio dans cette vidéo.</string>
     <string name="player_no_subtitles">Aucun sous-titre disponible dans cette vidéo.</string>
     <string name="player_off">Désactivés</string>
+    <string name="player_retrying">Nouvelle tentative… (%1$d sur %2$d)</string>
     <string name="player_subtitles">Sous-titres</string>
     <string name="player_try_other">Appuyez sur Haut ou Bas pour essayer une autre chaîne, sur Retour pour revenir.</string>
     <string name="player_unsupported">non pris en charge par cette TV</string>

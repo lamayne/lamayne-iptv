@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -131,44 +132,59 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        HomeBackdrop(slide?.backdrop)
-
-        // Behind the texts of the banner: the title stays readable whatever the picture.
+    Column(modifier = Modifier.fillMaxSize()) {
+        // The top of the page never scrolls: picture and texts stay where they are, so the
+        // title cannot go under the menu, and the rows never slide over the picture.
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.62f)
-                .height(300.dp)
-                .background(Brush.horizontalGradient(listOf(Color(0xD90A0A12), Color.Transparent))),
-        )
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 56.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .fillMaxWidth()
+                .height(260.dp),
         ) {
-            item {
-                HeroBlock(
-                    slide = slide,
-                    count = count,
-                    index = index,
-                    loading = loading,
-                    error = error,
-                    requester = entryFocus,
-                    onRetry = { viewModel.retry(Tab.HOME) },
-                    // "Play" opens the page of the movie or series: Play, Resume and the
-                    // rest are there.
-                    onOpen = { chosen ->
-                        val movie = chosen.movie
+            HomeBackdrop(
+                slide?.backdrop,
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .fillMaxWidth(0.7f)
+                    .fillMaxHeight(),
+            )
 
-                        if (movie != null) viewModel.openMovie(movie)
-                        else chosen.series?.let { viewModel.openSeries(it) }
-                    },
-                    onStep = { delta -> if (count > 1) index = (index + delta + count) % count },
-                    onFocusChange = { heroFocused = it },
-                )
-            }
+            // Behind the texts: the title stays readable whatever the picture.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.6f)
+                    .fillMaxHeight()
+                    .background(Brush.horizontalGradient(listOf(Color(0xD90A0A12), Color.Transparent))),
+            )
 
+            HeroBlock(
+                slide = slide,
+                count = count,
+                index = index,
+                loading = loading,
+                error = error,
+                requester = entryFocus,
+                onRetry = { viewModel.retry(Tab.HOME) },
+                // "Play" opens the page of the movie or series: Play, Resume and the
+                // rest are there.
+                onOpen = { chosen ->
+                    val movie = chosen.movie
+
+                    if (movie != null) viewModel.openMovie(movie)
+                    else chosen.series?.let { viewModel.openSeries(it) }
+                },
+                onStep = { delta -> if (count > 1) index = (index + delta + count) % count },
+                onFocusChange = { heroFocused = it },
+            )
+        }
+
+        // Only the rows scroll, inside what is left of the screen.
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentPadding = PaddingValues(top = 2.dp, bottom = 40.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             if (continueItems.isNotEmpty()) {
                 item {
                     ContentRow(stringResource(R.string.home_continue), continueItems) { item ->
@@ -181,7 +197,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                             },
                             image = item.image,
                             progress = item.fraction,
-                            modifier = Modifier.width(215.dp),
+                            modifier = Modifier.width(200.dp),
                             onClick = { pendingResume = item },
                         )
                     }
@@ -195,7 +211,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
 
                         ChannelTile(
                             channel = channel,
-                            modifier = Modifier.width(128.dp),
+                            modifier = Modifier.width(120.dp),
                             nowTitle = now?.title,
                             nowProgress = now?.progress(System.currentTimeMillis() / 1000),
                             onLongClick = { viewModel.toggleFavorite(channel) },
@@ -211,7 +227,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                         PosterCard(
                             title = displayName(movie.name),
                             image = movie.poster,
-                            modifier = Modifier.width(112.dp),
+                            modifier = Modifier.width(100.dp),
                             rating = ratingText(movie.rating),
                             onLongClick = { viewModel.toggleFavorite(movie) },
                             onClick = { viewModel.openMovie(movie) },
@@ -226,7 +242,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                         PosterCard(
                             title = displayName(series.name),
                             image = series.poster,
-                            modifier = Modifier.width(112.dp),
+                            modifier = Modifier.width(100.dp),
                             rating = ratingText(series.rating),
                             onLongClick = { viewModel.toggleFavorite(series) },
                             onClick = { viewModel.openSeries(series) },
@@ -241,7 +257,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                         PosterCard(
                             title = displayName(movie.name),
                             image = movie.poster,
-                            modifier = Modifier.width(112.dp),
+                            modifier = Modifier.width(100.dp),
                             rating = ratingText(movie.rating),
                             onLongClick = { viewModel.toggleFavorite(movie) },
                             onClick = { viewModel.openMovie(movie) },
@@ -256,7 +272,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                         PosterCard(
                             title = displayName(series.name),
                             image = series.poster,
-                            modifier = Modifier.width(112.dp),
+                            modifier = Modifier.width(100.dp),
                             rating = ratingText(series.rating),
                             onLongClick = { viewModel.toggleFavorite(series) },
                             onClick = { viewModel.openSeries(series) },
@@ -287,34 +303,34 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
 // The picture behind the page. It is not framed: the left, the top and the bottom are
 // made transparent, so it melts into the background of the app whatever is behind.
 @Composable
-private fun HomeBackdrop(url: String?) {
+private fun HomeBackdrop(url: String?, modifier: Modifier) {
     Crossfade(
         targetState = url,
         animationSpec = tween(900),
         label = "backdrop",
-        modifier = Modifier
-            .fillMaxSize()
+        modifier = modifier
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithContent {
                 drawContent()
 
-                // left -> right: invisible, then half, then fully there
+                // left -> right: melts into the page on the left
                 drawRect(
                     brush = Brush.horizontalGradient(
                         0f to Color.Transparent,
-                        0.45f to Color(0x66000000),
+                        0.45f to Color(0xB3000000),
                         0.8f to Color.Black,
                     ),
                     blendMode = BlendMode.DstIn,
                 )
 
-                // top -> bottom: melts at the top, stays in the middle, fades before the rows
+                // top -> bottom: melts at the top, and is gone at the bottom of the zone, so
+                // the rows below sit on a clean background
                 drawRect(
                     brush = Brush.verticalGradient(
                         0f to Color.Transparent,
-                        0.16f to Color.Black,
-                        0.3f to Color.Black,
-                        0.68f to Color.Transparent,
+                        0.14f to Color.Black,
+                        0.55f to Color.Black,
+                        1f to Color.Transparent,
                     ),
                     blendMode = BlendMode.DstIn,
                 )
@@ -349,8 +365,7 @@ private fun HeroBlock(
 ) {
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(290.dp)
+            .fillMaxSize()
             .onFocusChanged { onFocusChange(it.hasFocus) }
             .onPreviewKeyEvent { event ->
                 if (event.type != KeyEventType.KeyDown || count < 2) {
@@ -392,8 +407,8 @@ private fun HeroBlock(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 48.dp, bottom = 10.dp)
-                    .width(500.dp),
+                    .padding(start = 48.dp, bottom = 6.dp)
+                    .width(480.dp),
             ) {
                 // Only the texts change between two banners: the button keeps the cursor.
                 run {
@@ -418,9 +433,9 @@ private fun HeroBlock(
                             style = TextStyle(
                                 shadow = Shadow(color = Color(0xCC000000), offset = Offset(0f, 3f), blurRadius = 12f),
                             ),
-                            fontSize = 36.sp,
+                            fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
-                            lineHeight = 40.sp,
+                            lineHeight = 36.sp,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -451,14 +466,14 @@ private fun HeroBlock(
                                 shown.plot,
                                 color = Color(0xFFE0E0EC),
                                 fontSize = 14.sp,
-                                maxLines = 3,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ActionButton(

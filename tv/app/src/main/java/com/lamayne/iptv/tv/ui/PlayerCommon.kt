@@ -4,6 +4,7 @@ import android.content.Context
 import com.lamayne.iptv.tv.R
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.Composable
 import androidx.media3.common.C
@@ -57,18 +58,19 @@ fun createPlayer(context: Context, tunneling: Boolean = false): ExoPlayer {
         .setEnableDecoderFallback(true)
         .forceEnableMediaCodecAsynchronousQueueing()
 
-    val player = ExoPlayer.Builder(context, renderers)
-        .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
-        .build()
+    // Tunneling (picture and sound synchronised by the hardware) is set on the track selector.
+    val selector = DefaultTrackSelector(context)
 
     if (tunneling) {
-        player.trackSelectionParameters = player.trackSelectionParameters
-            .buildUpon()
+        selector.parameters = selector.buildUponParameters()
             .setTunnelingEnabled(true)
             .build()
     }
 
-    return player
+    return ExoPlayer.Builder(context, renderers)
+        .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
+        .setTrackSelector(selector)
+        .build()
 }
 
 // "Video video/avc 1920x1080 | Audio audio/ac3 6ch": tells at once when a codec

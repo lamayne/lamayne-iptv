@@ -90,6 +90,13 @@ fun LivePlayerScreen(
     val playFocus = remember { FocusRequester() }
     val exoPlayer = remember { createPlayer(context) }
 
+    // Three passes over the addresses (MPEG-TS, then HLS) before giving up.
+    val passes = 3
+
+    fun retryOrFail(reason: String) {
+        if (attempt + 1 < currentUrls.size * passes) attempt += 1 else failure = reason
+    }
+
     fun reveal() {
         overlay = true
         touch = System.currentTimeMillis()
@@ -106,11 +113,7 @@ fun LivePlayerScreen(
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                if (attempt + 1 < currentUrls.size) {
-                    attempt += 1
-                } else {
-                    failure = "${error.errorCodeName}: ${error.message ?: ""}"
-                }
+                retryOrFail("${error.errorCodeName}: ${error.message ?: ""}")
             }
 
             override fun onTracksChanged(tracks: Tracks) {
@@ -148,10 +151,20 @@ fun LivePlayerScreen(
 
     // The first address failed: try the next one.
     LaunchedEffect(attempt) {
-        if (attempt > 0 && attempt < currentUrls.size) {
-            exoPlayer.setMediaItem(MediaItem.fromUri(currentUrls[attempt]))
+        if (attempt > 0 && failure == null) {
+            delay(1_200)
+            exoPlayer.setMediaItem(MediaItem.fromUri(currentUrls[attempt % currentUrls.size]))
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
+        }
+    }
+
+    // Loading but never starting: after 20 seconds it counts as a failed attempt.
+    LaunchedEffect(buffering, attempt, channel.id) {
+        if (buffering && failure == null) {
+            delay(20_000)
+
+            if (buffering) retryOrFail("Timeout")
         }
     }
 
@@ -216,14 +229,22 @@ fun LivePlayerScreen(
                     keepScreenOn = true
                     isFocusable = false
                     isFocusableInTouchMode = false
-                    setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                    // one spinner only: ours (the player's own made a second circle)
+                    setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                     player = exoPlayer
                 }
             },
         )
 
         if (buffering && failure == null) {
-            LoadingBadge(stringResource(R.string.common_loading), Modifier.align(Alignment.Center))
+            LoadingBadge(
+                if (attempt > 0) {
+                    stringResource(R.string.player_retrying, attempt + 1, currentUrls.size * passes)
+                } else {
+                    stringResource(R.string.common_loading)
+                },
+                Modifier.align(Alignment.Center),
+            )
         }
 
         if (overlay) {
@@ -280,13 +301,6 @@ fun LivePlayerScreen(
                     }
                 }
 
-                Spacer(Modifier.weight(1f))
-
-                Text(
-                    stringResource(R.string.player_hint_live),
-                    color = Color(0xFFB8B8CC),
-                    fontSize = 12.sp,
-                )
             }
 
             // ---- bottom: one slim row: buttons, what is on now, what comes next

@@ -309,7 +309,8 @@ fun VodPlayerScreen(
                     keepScreenOn = true
                     isFocusable = false
                     isFocusableInTouchMode = false
-                    setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                    // one spinner only: ours
+                    setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                     player = exoPlayer
                 }
             },
@@ -378,7 +379,7 @@ fun VodPlayerScreen(
                 }
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RoundButton(onClick = { seekBy(-10_000) }) {
@@ -425,10 +426,10 @@ fun VodPlayerScreen(
                         focusRequester = subFocus,
                     )
 
-                    ActionButton(
-                        text = stringResource(R.string.player_frame) + ": " + aspectLong(aspect),
-                        onClick = onCycleAspect,
-                    )
+                    // Picture framing: a small round button (the long label pushed the heart out)
+                    RoundButton(onClick = onCycleAspect) {
+                        Text(aspectShort(aspect), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
 
                     RoundButton(onClick = { onToggleFavorite() }) {
                         Icon(
@@ -440,13 +441,6 @@ fun VodPlayerScreen(
                     }
                 }
 
-                Spacer(Modifier.height(8.dp))
-
-                Text(
-                    stringResource(R.string.player_hint_vod),
-                    color = Color(0xFFB8B8CC),
-                    fontSize = 13.sp,
-                )
             }
         }
 

@@ -137,6 +137,40 @@ object XtreamClient {
             readArray(reader) { item -> readChannel(item) }
         }
 
+    // Only the name and the number of every live channel: a light list (no pictures, no
+    // categories), used to find the same channel in another category.
+    suspend fun liveNames(credentials: Credentials): List<Pair<String, String>> =
+        fetch(apiUrl(credentials, "get_live_streams")) { reader ->
+            readArray(reader) { item -> readNameAndId(item) }
+        }
+
+    private fun readNameAndId(reader: JsonReader): Pair<String, String>? {
+        if (reader.peek() != JsonToken.BEGIN_OBJECT) {
+            reader.skipValue()
+            return null
+        }
+
+        var id: String? = null
+        var name: String? = null
+
+        reader.beginObject()
+
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "stream_id" -> id = reader.textOrNull()
+                "name" -> name = reader.textOrNull()
+                else -> reader.skipValue()
+            }
+        }
+
+        reader.endObject()
+
+        val streamId = id ?: return null
+        val streamName = name ?: return null
+
+        return streamName to streamId
+    }
+
     // What is on now and next for one channel.
     suspend fun shortEpg(credentials: Credentials, streamId: String): List<EpgEntry> =
         fetch(

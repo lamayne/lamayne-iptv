@@ -386,7 +386,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         MediaKind.SERIES to Mutex(),
     )
     private var movieTitleMap: Map<String, List<Pair<Movie, Int?>>>? = null
-    private var channelKeyMap: Map<String, List<Channel>>? = null
+    private var siblingMap: Map<String, List<String>>? = null
+    private var siblingJob: Job? = null
     private val filmographyCache = HashMap<String, Filmography.Result>()
 
     private var homeJob: Job? = null
@@ -524,7 +525,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         seriesIndex.set(emptyList())
         indexLoaded.clear()
         movieTitleMap = null
-        channelKeyMap = null
+        siblingMap = null
         M3uClient.reset()
         filmographyCache.clear()
         epgCache.clear()
@@ -750,7 +751,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // The same channel often exists in several categories (France Premium, France FHD...)
     // and the provider only has the guide for some of them: when this one has none, the
-    // guide of the channel with the same name is used.
+    // guide of the channel with the same name is used. The list of names is built once, in
+    // the background, and is light (name and number only).
     private suspend fun loadEntries(credentials: Credentials, channel: Channel): List<EpgEntry> {
         val own = epgSemaphore.withPermit { XtreamClient.shortEpg(credentials, channel.id) }
 
@@ -760,21 +762,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         if (key.length < 2) return own
 
-        try {
-            ensureIndex(MediaKind.LIVE)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
+        val map = siblingMap
+
+        if (map == null) {
+            loadSiblings(credentials)
             return own
         }
 
-        val map = channelKeyMap ?: channelIndex.items()
-            .groupBy { channelKey(it.name) }
-            .also { channelKeyMap = it }
-
-        for (sibling in map[key].orEmpty().filter { it.id != channel.id }.take(5)) {
+        for (id in map[key].orEmpty().filter { it != channel.id }.take(5)) {
             val entries = try {
-                epgSemaphore.withPermit { XtreamClient.shortEpg(credentials, sibling.id) }
+                epgSemaphore.withPermit { XtreamClient.shortEpg(credentials, id) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -785,6 +782,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         return own
+    }
+
+    private fun loadSiblings(credentials: Credentials) {
+        if (siblingJob?.isActive == true) return
+
+        siblingJob = viewModelScope.launch {
+            try {
+                val pairs = XtreamClient.liveNames(credentials)
+
+                siblingMap = withContext(Dispatchers.Default) {
+                    pairs.groupBy({ channelKey(it.first) }, { it.second })
+                }
+
+                // The channels that had no guide are asked again, with this new help.
+                epgCache.entries.removeAll { it.value.second.isEmpty() }
+                _epgVersion.value = _epgVersion.value + 1
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                siblingMap = emptyMap()
+            } catch (e: OutOfMemoryError) {
+                siblingMap = emptyMap()
+            }
+        }
     }
 
     // "|FR| TF1 FHD" and "TF1" give the same key.
@@ -835,7 +856,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         when (kind) {
             MediaKind.LIVE -> {
                 M3uClient.reset()
-                channelKeyMap = null
+                siblingMap = null
                 channelIndex.set(emptyList())
                 live.reset()
                 live.start(credentials)
@@ -1310,6 +1331,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 indexLoaded.add(kind)
+            } catch (e: OutOfMemoryError) {
+                // a list too big for this TV: the app must not close because of it
+                channelIndex.set(emptyList())
+                movieIndex.set(emptyList())
+                seriesIndex.set(emptyList())
+                throw java.io.IOException("Not enough memory for this list")
             } finally {
                 _searchLoading.value = _searchLoading.value - kind
             }

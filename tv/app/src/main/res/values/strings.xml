@@ -103,12 +103,10 @@
     <string name="player_cannot_play_vod">This video cannot be played</string>
     <string name="player_close">Close</string>
     <string name="player_dropped">Dropped frames: %1$d</string>
-    <string name="player_frame">Frame</string>
-    <string name="player_hint_live">Up / Down: change channel     Back: close</string>
-    <string name="player_hint_vod">Left / Right: 10 s     Back: close</string>
     <string name="player_no_audio">No other audio track in this video.</string>
     <string name="player_no_subtitles">No subtitles available in this video.</string>
     <string name="player_off">Off</string>
+    <string name="player_retrying">Trying again… (%1$d of %2$d)</string>
     <string name="player_subtitles">Subtitles</string>
     <string name="player_try_other">Press Up or Down to try another channel, Back to return.</string>
     <string name="player_unsupported">not supported by this TV</string>

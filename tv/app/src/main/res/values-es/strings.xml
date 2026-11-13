@@ -103,12 +103,10 @@
     <string name="player_cannot_play_vod">Este vídeo no se puede reproducir</string>
     <string name="player_close">Cerrar</string>
     <string name="player_dropped">Fotogramas perdidos: %1$d</string>
-    <string name="player_frame">Marco</string>
-    <string name="player_hint_live">Arriba / Abajo: cambiar de canal     Atrás: cerrar</string>
-    <string name="player_hint_vod">Izquierda / Derecha: 10 s     Atrás: cerrar</string>
     <string name="player_no_audio">No hay otras pistas de audio en este vídeo.</string>
     <string name="player_no_subtitles">No hay subtítulos disponibles en este vídeo.</string>
     <string name="player_off">Desactivados</string>
+    <string name="player_retrying">Reintentando… (%1$d de %2$d)</string>
     <string name="player_subtitles">Subtítulos</string>
     <string name="player_try_other">Pulsa Arriba o Abajo para probar otro canal, Atrás para volver.</string>
     <string name="player_unsupported">no compatible con esta TV</string>
