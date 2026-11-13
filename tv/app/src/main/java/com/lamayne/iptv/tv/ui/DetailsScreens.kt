@@ -121,24 +121,6 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
 
     LaunchedEffect(Unit) { runCatching { playFocus.requestFocus() } }
 
-    var askResume by remember { mutableStateOf(false) }
-
-    if (askResume && saved != null) {
-        ResumeDialog(
-            title = displayName(movie.name),
-            positionMs = saved.position,
-            onResume = {
-                askResume = false
-                viewModel.playMovie(movie, resume = true)
-            },
-            onRestart = {
-                askResume = false
-                viewModel.playMovie(movie, resume = false)
-            },
-            onDismiss = { askResume = false },
-        )
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         Backdrop(info?.backdrop ?: movie.poster, movie.name)
 
@@ -198,11 +180,13 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ActionButton(
-                        text = stringResource(R.string.details_play),
-                        onClick = {
-                            // Already started: ask whether to resume or start over.
-                            if (canResume) askResume = true else viewModel.playMovie(movie, resume = false)
+                        // Already started: the movie goes on where it stopped.
+                        text = if (canResume && saved != null) {
+                            stringResource(R.string.details_resume, formatDuration(saved.position))
+                        } else {
+                            stringResource(R.string.details_play)
                         },
+                        onClick = { viewModel.playMovie(movie, resume = true) },
                         primary = true,
                         focusRequester = playFocus,
                         icon = {
@@ -309,7 +293,6 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
     }
     val episodes = seasons[season].orEmpty()
     val firstEpisodeFocus = remember { FocusRequester() }
-    var pending by remember { mutableStateOf<Episode?>(null) }
 
     BackHandler { viewModel.back() }
 
@@ -423,14 +406,7 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
                                         fraction = saved?.fraction,
                                         finished = saved?.finished == true,
                                         focusRequester = if (episode.id == episodes.first().id) firstEpisodeFocus else null,
-                                        onClick = {
-                                            // Already started: ask whether to resume or start over.
-                                            if (saved != null && saved.inProgress) {
-                                                pending = episode
-                                            } else {
-                                                viewModel.playEpisode(series, episode, resume = false)
-                                            }
-                                        },
+                                        onClick = { viewModel.playEpisode(series, episode, resume = true) },
                                     )
                                 }
                             }
@@ -443,24 +419,6 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
 
             item { SimilarSeriesSection(viewModel) }
         }
-    }
-
-    pending?.let { episode ->
-        val saved = progress.firstOrNull { it.kind == MediaKind.EPISODE && it.id == episode.id }
-
-        ResumeDialog(
-            title = episode.title,
-            positionMs = saved?.position ?: 0L,
-            onResume = {
-                pending = null
-                viewModel.playEpisode(series, episode, resume = true)
-            },
-            onRestart = {
-                pending = null
-                viewModel.playEpisode(series, episode, resume = false)
-            },
-            onDismiss = { pending = null },
-        )
     }
 }
 

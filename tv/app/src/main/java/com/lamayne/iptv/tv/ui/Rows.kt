@@ -412,9 +412,9 @@ fun CategoryPanel(
     }
 }
 
-// The title of the page on top of a list, with a count on the right.
+// The title of the page on top of a list, with an optional button on the right.
 @Composable
-fun ListHeader(title: String, count: String, modifier: Modifier = Modifier) {
+fun ListHeader(title: String, modifier: Modifier = Modifier, action: (@Composable () -> Unit)? = null) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -431,7 +431,29 @@ fun ListHeader(title: String, count: String, modifier: Modifier = Modifier) {
             modifier = Modifier.weight(1f),
         )
 
-        Text(count, color = Muted, fontSize = 14.sp)
+        action?.invoke()
+    }
+}
+
+// Reverses the order of the favourites (the last added first, or last).
+@Composable
+private fun OrderButton(newestFirst: Boolean, onClick: () -> Unit) {
+    FocusCard(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        container = Color(0x22FFFFFF),
+        focusedContainer = Color(0x44FFFFFF),
+        borderColor = Accent,
+        focusedScale = 1.05f,
+    ) {
+        Text(
+            stringResource(if (newestFirst) R.string.order_newest else R.string.order_oldest),
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+        )
     }
 }
 
@@ -471,6 +493,8 @@ fun <T : Any> BrowsePage(
     val error by controller.error.collectAsStateWithLifecycle()
     val query by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchLoading by viewModel.searchLoading.collectAsStateWithLifecycle()
+    val newestFirst by viewModel.favNewestFirst.collectAsStateWithLifecycle()
+    val orderedFavorites = remember(favorites, newestFirst) { if (newestFirst) favorites else favorites.asReversed() }
     var mode by remember {
         mutableStateOf(
             viewModel.browseMode(kind)?.let { BrowseMode.values().getOrNull(it) }
@@ -488,7 +512,7 @@ fun <T : Any> BrowsePage(
     val recentFocus = remember { FocusRequester() }
 
     val shown = when (mode) {
-        BrowseMode.FAVORITES -> favorites
+        BrowseMode.FAVORITES -> orderedFavorites
         BrowseMode.RECENT -> recent
         BrowseMode.SEARCH -> searchResults
         BrowseMode.CATEGORY -> items
@@ -503,7 +527,7 @@ fun <T : Any> BrowsePage(
     }
 
     FocusFirstWhen(
-        key = Triple(mode, shown.firstOrNull()?.let(idOf), startIndex),
+        key = Triple(mode, if (mode == BrowseMode.FAVORITES) shown.isNotEmpty() else shown.firstOrNull()?.let(idOf), startIndex),
         enabled = mode != BrowseMode.SEARCH && shown.isNotEmpty(),
         requester = firstFocus,
     )
@@ -560,9 +584,11 @@ fun <T : Any> BrowsePage(
                 BrowseMode.CATEGORY -> selected?.name?.trim() ?: stringResource(panelTitle)
             }
 
+            val orderButton: @Composable () -> Unit = { OrderButton(newestFirst) { viewModel.toggleFavoritesOrder() } }
+
             ListHeader(
                 title = title,
-                count = if (shown.isEmpty()) "" else stringResource(countFormat, shown.size),
+                action = if (mode == BrowseMode.FAVORITES && favorites.size > 1) orderButton else null,
             )
 
             if (mode == BrowseMode.SEARCH) {

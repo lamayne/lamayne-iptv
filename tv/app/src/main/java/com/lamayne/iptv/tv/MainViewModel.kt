@@ -426,6 +426,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val _favNewestFirst = MutableStateFlow(settings.favNewestFirst)
+    val favNewestFirst: StateFlow<Boolean> = _favNewestFirst.asStateFlow()
+
+    fun toggleFavoritesOrder() {
+        val next = !_favNewestFirst.value
+
+        _favNewestFirst.value = next
+        settings.favNewestFirst = next
+    }
+
     private val _aspect = MutableStateFlow(settings.aspect)
     val aspect: StateFlow<Int> = _aspect.asStateFlow()
 
@@ -1571,6 +1581,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 val movieCategories = XtreamClient.movieCategories(credentials)
                 val seriesCategories = XtreamClient.seriesCategories(credentials)
+
+                homeMovieCategories = movieCategories
+                homeSeriesCategories = seriesCategories
                 val movieCategory = chooseMovieCategory(credentials, movieCategories, _hiddenMovies.value, target, strict)
                 val seriesCategory = chooseSeriesCategory(credentials, seriesCategories, _hiddenSeries.value, target, strict)
 
@@ -1602,6 +1615,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ---- which category is "the latest ones" in the chosen language
 
     private val categoryLanguageCache = HashMap<String, String>()
+    private var homeMovieCategories: List<Category> = emptyList()
+    private var homeSeriesCategories: List<Category> = emptyList()
 
     private fun latestScore(name: String): Int {
         val text = normalizeText(name)
@@ -1772,7 +1787,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (matching.size >= 5) break
         }
 
-        if (matching.isEmpty() && !strict) _featured.value = others.take(5)
+        if (matching.isEmpty()) {
+            // Nothing in the chosen language: random movies and series (with a synopsis and a picture)
+            // rather than an empty banner.
+            _featured.value = randomSlides(credentials, target)
+        }
+    }
+
+    // Titles taken at random in random categories; the ones in the chosen language come first.
+    private suspend fun randomSlides(credentials: Credentials, target: String): List<Featured> {
+        val candidates = ArrayList<Any>()
+
+        try {
+            for (category in homeMovieCategories.filter { it.id !in _hiddenMovies.value }.shuffled().take(2)) {
+                candidates.addAll(
+                    XtreamClient.movies(credentials, category.id).filter { !it.poster.isNullOrBlank() }.shuffled().take(8)
+                )
+            }
+
+            for (category in homeSeriesCategories.filter { it.id !in _hiddenSeries.value }.shuffled().take(2)) {
+                candidates.addAll(
+                    XtreamClient.series(credentials, category.id).filter { !it.poster.isNullOrBlank() }.shuffled().take(8)
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // what was found is used
+        }
+
+        val matching = ArrayList<Featured>()
+        val others = ArrayList<Featured>()
+
+        for (group in candidates.shuffled().chunked(4)) {
+            val built = coroutineScope {
+                group.map { candidate -> async { buildSlide(credentials, candidate) } }.awaitAll()
+            }
+
+            for (pair in built) {
+                val (slide, language) = pair ?: continue
+
+                if (language == target) matching.add(slide) else others.add(slide)
+            }
+
+            _featured.value = (matching + others).take(5)
+
+            if (matching.size + others.size >= 5) break
+        }
+
+        return (matching + others).take(5)
     }
 
     // The slide and the language of its synopsis.

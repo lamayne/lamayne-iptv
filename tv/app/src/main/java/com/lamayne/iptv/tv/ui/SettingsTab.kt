@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -155,55 +156,58 @@ fun SettingsTab(viewModel: MainViewModel) {
         contentPadding = PaddingValues(top = 4.dp, bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // 1. Language (the movies and series on the home page follow it)
+        // 1. Language: the app and the home recommendations, side by side
         item {
             Group(stringResource(R.string.settings_language)) {
-                SelectField(
-                    title = stringResource(R.string.settings_language),
-                    options = listOf(
-                        "system" to stringResource(R.string.settings_language_auto),
-                        "en" to "English",
-                        "fr" to "Fran\u00e7ais",
-                        "es" to "Espa\u00f1ol",
-                    ),
-                    selectedKey = language,
-                    onSelect = { code ->
-                        if (language != code) {
-                            language = code
-                            viewModel.setLanguage(code)
-                            // The screens are rebuilt in the new language.
-                            context.findActivity()?.recreate()
-                        }
-                    },
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+                    Column {
+                        Text(stringResource(R.string.settings_app_language), color = Muted, fontSize = 13.sp)
 
-                Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(6.dp))
 
-                Text(stringResource(R.string.settings_language_hint), color = Muted, fontSize = 14.sp)
-            }
-        }
+                        SelectField(
+                            title = stringResource(R.string.settings_app_language),
+                            options = listOf(
+                                "system" to stringResource(R.string.settings_language_auto),
+                                "en" to "English",
+                                "fr" to "Fran\u00e7ais",
+                                "es" to "Espa\u00f1ol",
+                            ),
+                            selectedKey = language,
+                            onSelect = { code ->
+                                if (language != code) {
+                                    language = code
+                                    viewModel.setLanguage(code)
+                                    // The screens are rebuilt in the new language.
+                                    context.findActivity()?.recreate()
+                                }
+                            },
+                        )
+                    }
 
+                    Column {
+                        Text(stringResource(R.string.settings_reco), color = Muted, fontSize = 13.sp)
 
+                        Spacer(Modifier.height(6.dp))
 
-        // 1b. Language of the home recommendations (only languages found in the visible categories)
-        item {
-            Group(stringResource(R.string.settings_reco)) {
-                Text(stringResource(R.string.settings_reco_hint), color = Muted, fontSize = 15.sp)
+                        // French, English and Spanish are always offered (the synopsis decides), then the
+                        // other languages found in the categories, and the chosen one
+                        SelectField(
+                            title = stringResource(R.string.settings_reco),
+                            options = listOf("auto" to stringResource(R.string.settings_language_auto)) +
+                                (listOf("fr", "en", "es") + availableLanguages + homeLanguage)
+                                    .filter { it != "auto" }
+                                    .distinct()
+                                    .map { it to languageLabel(it) },
+                            selectedKey = homeLanguage,
+                            onSelect = { code -> viewModel.setHomeLanguage(code) },
+                        )
+                    }
+                }
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(12.dp))
 
-                // French, English and Spanish are always offered (the synopsis decides), then the other
-                // languages found in the categories, and the chosen one
-                SelectField(
-                    title = stringResource(R.string.settings_reco),
-                    options = listOf("auto" to stringResource(R.string.settings_language_auto)) +
-                        (listOf("fr", "en", "es") + availableLanguages + homeLanguage)
-                            .filter { it != "auto" }
-                            .distinct()
-                            .map { it to languageLabel(it) },
-                    selectedKey = homeLanguage,
-                    onSelect = { code -> viewModel.setHomeLanguage(code) },
-                )
+                Text(stringResource(R.string.settings_reco_hint), color = Muted, fontSize = 13.sp)
             }
         }
 
@@ -253,8 +257,7 @@ fun SettingsTab(viewModel: MainViewModel) {
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_all),
                         primary = true,
-                        fill = true,
-                        modifier = Modifier.weight(1.7f),
+                        modifier = Modifier.widthIn(min = 150.dp),
                         onClick = {
                             viewModel.refreshAll()
                             refreshMessage = refreshing
@@ -262,8 +265,7 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_live),
-                        fill = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(min = 150.dp),
                         onClick = {
                             viewModel.refresh(MediaKind.LIVE)
                             refreshMessage = refreshing
@@ -271,8 +273,7 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_movies),
-                        fill = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(min = 150.dp),
                         onClick = {
                             viewModel.refresh(MediaKind.MOVIE)
                             refreshMessage = refreshing
@@ -280,8 +281,7 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_series),
-                        fill = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(min = 150.dp),
                         onClick = {
                             viewModel.refresh(MediaKind.SERIES)
                             refreshMessage = refreshing
@@ -289,8 +289,7 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_guide),
-                        fill = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(min = 150.dp),
                         onClick = {
                             viewModel.refreshGuide()
                             refreshMessage = refreshing
@@ -321,20 +320,17 @@ fun SettingsTab(viewModel: MainViewModel) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ActionButton(
                         text = stringResource(R.string.live_categories),
-                        fill = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(min = 150.dp),
                         onClick = { viewModel.openManageCategories(MediaKind.LIVE) },
                     )
                     ActionButton(
                         text = stringResource(R.string.movies_categories),
-                        fill = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(min = 150.dp),
                         onClick = { viewModel.openManageCategories(MediaKind.MOVIE) },
                     )
                     ActionButton(
                         text = stringResource(R.string.series_categories),
-                        fill = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(min = 150.dp),
                         onClick = { viewModel.openManageCategories(MediaKind.SERIES) },
                     )
                 }
@@ -349,14 +345,12 @@ fun SettingsTab(viewModel: MainViewModel) {
                         text = stringResource(R.string.settings_smooth) + ": " +
                             stringResource(if (smooth) R.string.settings_on else R.string.settings_off),
                         primary = smooth,
-                        fill = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(min = 150.dp),
                         onClick = { viewModel.toggleTunneling() },
                     )
                     ActionButton(
                         text = stringResource(R.string.settings_clear_history),
-                        fill = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(min = 150.dp),
                         onClick = {
                             viewModel.clearProgress()
                             message = cleared

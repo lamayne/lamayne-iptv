@@ -375,62 +375,6 @@ fun ChannelTile(
     }
 }
 
-// "Resume at 34:10" or "Start over": asked before playing something already started.
-@Composable
-fun ResumeDialog(
-    title: String,
-    positionMs: Long,
-    onResume: () -> Unit,
-    onRestart: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val first = remember { FocusRequester() }
-
-    LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(Panel)
-                .padding(horizontal = 36.dp, vertical = 30.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                stringResource(R.string.resume_title),
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-
-            Spacer(Modifier.size(6.dp))
-
-            Text(
-                title,
-                color = Muted,
-                fontSize = 15.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-
-            Spacer(Modifier.size(22.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                ActionButton(
-                    text = stringResource(R.string.details_resume, formatDuration(positionMs)),
-                    onClick = onResume,
-                    primary = true,
-                    focusRequester = first,
-                )
-                ActionButton(
-                    text = stringResource(R.string.details_restart),
-                    onClick = onRestart,
-                )
-            }
-        }
-    }
-}
-
 // A list of items next to each other that scrolls sideways, with its title.
 @Composable
 fun <T> ContentRow(

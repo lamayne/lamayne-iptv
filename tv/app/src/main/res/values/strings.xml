@@ -44,7 +44,6 @@
     <string name="details_no_episodes">No episode available</string>
     <string name="details_no_plot">No synopsis available.</string>
     <string name="details_play">Play</string>
-    <string name="details_restart">Start over</string>
     <string name="details_resume">Resume %1$s</string>
     <string name="details_season">Season %1$d</string>
     <string name="err_address">That server address does not look valid.</string>
@@ -98,6 +97,8 @@
     <string name="nav_movies">Movies</string>
     <string name="nav_series">Series</string>
     <string name="nav_settings">Settings</string>
+    <string name="order_newest">Newest first</string>
+    <string name="order_oldest">Oldest first</string>
     <string name="player_audio">Audio</string>
     <string name="player_back_hint">Press Back to return.</string>
     <string name="player_cannot_play">This channel cannot be played</string>
@@ -117,7 +118,6 @@
     <string name="reason_genre">Same genre</string>
     <string name="recent_empty_hint">What you watch will appear here.</string>
     <string name="recent_empty_title">Nothing watched yet</string>
-    <string name="resume_title">Resume playback?</string>
     <string name="search_hint_live">Search a channel</string>
     <string name="search_hint_movies">Search a movie</string>
     <string name="search_hint_series">Search a series</string>
@@ -129,17 +129,17 @@
     <string name="series_count">%1$d series</string>
     <string name="settings_account">Account</string>
     <string name="settings_account_as">Signed in as %1$s on %2$s</string>
+    <string name="settings_app_language">App language</string>
     <string name="settings_clear_history">Clear watch history</string>
     <string name="settings_cleared">Done.</string>
     <string name="settings_disclaimer">LAMAYNE IPTV is a player: it provides no content. Use only sources you are authorised to use.</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_auto">Automatic</string>
-    <string name="settings_language_hint">The movies and series suggested on the home page follow this language.</string>
     <string name="settings_off">Off</string>
     <string name="settings_on">On</string>
     <string name="settings_playback_history">Playback and history</string>
     <string name="settings_reco">Home recommendations</string>
-    <string name="settings_reco_hint">Language of the synopses of the movies and series put forward on the home page.</string>
+    <string name="settings_reco_hint">The home recommendations follow the language of the synopsis. If nothing matches, random titles are shown.</string>
     <string name="settings_refresh">Update</string>
     <string name="settings_refresh_all">Update all</string>
     <string name="settings_refresh_guide">Guide</string>

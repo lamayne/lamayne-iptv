@@ -44,7 +44,6 @@
     <string name="details_no_episodes">Aucun épisode disponible</string>
     <string name="details_no_plot">Aucun résumé disponible.</string>
     <string name="details_play">Lire</string>
-    <string name="details_restart">Recommencer</string>
     <string name="details_resume">Reprendre à %1$s</string>
     <string name="details_season">Saison %1$d</string>
     <string name="err_address">Cette adresse de serveur ne semble pas valide.</string>
@@ -98,6 +97,8 @@
     <string name="nav_movies">Films</string>
     <string name="nav_series">Séries</string>
     <string name="nav_settings">Réglages</string>
+    <string name="order_newest">Plus récents d’abord</string>
+    <string name="order_oldest">Plus anciens d’abord</string>
     <string name="player_audio">Audio</string>
     <string name="player_back_hint">Appuyez sur Retour pour revenir.</string>
     <string name="player_cannot_play">Cette chaîne ne peut pas être lue</string>
@@ -117,7 +118,6 @@
     <string name="reason_genre">Même genre</string>
     <string name="recent_empty_hint">Ce que vous regardez apparaîtra ici.</string>
     <string name="recent_empty_title">Rien regardé pour le moment</string>
-    <string name="resume_title">Reprendre la lecture ?</string>
     <string name="search_hint_live">Rechercher une chaîne</string>
     <string name="search_hint_movies">Rechercher un film</string>
     <string name="search_hint_series">Rechercher une série</string>
@@ -129,17 +129,17 @@
     <string name="series_count">%1$d séries</string>
     <string name="settings_account">Compte</string>
     <string name="settings_account_as">Connecté en tant que %1$s sur %2$s</string>
+    <string name="settings_app_language">Langue de l’app</string>
     <string name="settings_clear_history">Effacer l\'historique de lecture</string>
     <string name="settings_cleared">Fait.</string>
     <string name="settings_disclaimer">LAMAYNE IPTV est un lecteur : il ne fournit aucun contenu. N\'utilisez que des sources que vous avez le droit d\'utiliser.</string>
     <string name="settings_language">Langue</string>
     <string name="settings_language_auto">Automatique</string>
-    <string name="settings_language_hint">Les films et séries proposés sur l’accueil suivent cette langue.</string>
     <string name="settings_off">Désactivé</string>
     <string name="settings_on">Activé</string>
     <string name="settings_playback_history">Lecture et historique</string>
     <string name="settings_reco">Recommandations de l’accueil</string>
-    <string name="settings_reco_hint">Langue des synopsis des films et séries mis en avant sur l’accueil.</string>
+    <string name="settings_reco_hint">Les recommandations de l’accueil suivent la langue du synopsis. Si rien ne correspond, des titres au hasard sont proposés.</string>
     <string name="settings_refresh">Mise à jour</string>
     <string name="settings_refresh_all">Tout mettre à jour</string>
     <string name="settings_refresh_guide">Guide</string>

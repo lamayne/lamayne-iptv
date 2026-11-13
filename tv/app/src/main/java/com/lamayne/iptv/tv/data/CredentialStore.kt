@@ -126,6 +126,13 @@ class SettingsStore(context: Context) {
             prefs.edit().putString("lang", value).apply()
         }
 
+    // false (the default): the last favourite added is at the end of the list.
+    var favNewestFirst: Boolean
+        get() = prefs.getBoolean("fav_newest_first", false)
+        set(value) {
+            prefs.edit().putBoolean("fav_newest_first", value).apply()
+        }
+
     // Open the app when the TV starts (needs the "display over other apps" permission).
     var launchAtBoot: Boolean
         get() = prefs.getBoolean("launch_at_boot", false)

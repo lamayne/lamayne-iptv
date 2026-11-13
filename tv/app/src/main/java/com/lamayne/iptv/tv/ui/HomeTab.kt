@@ -84,6 +84,10 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
     val favChannels by viewModel.favChannels.collectAsStateWithLifecycle()
     val favMovies by viewModel.favMovies.collectAsStateWithLifecycle()
     val favSeries by viewModel.favSeries.collectAsStateWithLifecycle()
+    val newestFirst by viewModel.favNewestFirst.collectAsStateWithLifecycle()
+    val favChannelsShown = if (newestFirst) favChannels else favChannels.asReversed()
+    val favMoviesShown = if (newestFirst) favMovies else favMovies.asReversed()
+    val favSeriesShown = if (newestFirst) favSeries else favSeries.asReversed()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     val loading by viewModel.homeLoading.collectAsStateWithLifecycle()
     val error by viewModel.homeError.collectAsStateWithLifecycle()
@@ -92,7 +96,6 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
     val continueItems = remember(progress) {
         progress.filter { it.inProgress }.sortedByDescending { it.updatedAt }.take(20)
     }
-    var pendingResume by remember { mutableStateOf<WatchProgress?>(null) }
     var index by remember { mutableStateOf(0) }
     var heroFocused by remember { mutableStateOf(false) }
     var focusedOnce by remember { mutableStateOf(false) }
@@ -117,6 +120,9 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
     val slides = fresh.ifEmpty { featured }
     val count = slides.size
     val slide = if (count > 0) slides[index % count] else null
+
+    // Nothing to put forward (and nothing loading): no empty banner, the rows start at the top.
+    val showHero = slide != null || loading || error != null
 
     // The favourite channels show what is on now.
     LaunchedEffect(favChannels, epgVersion) {
@@ -143,7 +149,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
     val rowsFocused = focusedRow >= 1
 
     LaunchedEffect(rowsFocused) {
-        if (rowsFocused) listState.animateScrollToItem(1)
+        if (rowsFocused && showHero) listState.animateScrollToItem(1)
     }
 
     LaunchedEffect(heroFocused) {
@@ -161,7 +167,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
             .onPreviewKeyEvent { event ->
                 // Up from the first row: the banner (scrolled away, so not reachable by itself)
                 // comes back and takes the cursor.
-                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp && focusedRow == 1) {
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp && focusedRow == 1 && showHero) {
                     scope.launch {
                         listState.animateScrollToItem(0)
                         delay(150)
@@ -175,7 +181,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
         contentPadding = PaddingValues(bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item {
+        if (showHero) item {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -237,7 +243,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                             image = item.image,
                             progress = item.fraction,
                             modifier = Modifier.width(120.dp),
-                            onClick = { pendingResume = item },
+                            onClick = { viewModel.resume(item) },
                         )
                     }
                 }
@@ -249,7 +255,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
 
             item {
                 Box(modifier = Modifier.onFocusChanged { onRowFocus(mine, it.hasFocus) }) {
-                    ContentRow(stringResource(R.string.home_my_channels), favChannels) { channel ->
+                    ContentRow(stringResource(R.string.home_my_channels), favChannelsShown) { channel ->
                         val now = epgMap[channel.id]?.now
 
                         ChannelTile(
@@ -258,7 +264,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                             nowTitle = now?.title,
                             nowProgress = now?.progress(System.currentTimeMillis() / 1000),
                             onLongClick = { viewModel.toggleFavorite(channel) },
-                            onClick = { viewModel.playLive(channel, favChannels) },
+                            onClick = { viewModel.playLive(channel, favChannelsShown) },
                         )
                     }
                 }
@@ -270,7 +276,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
 
             item {
                 Box(modifier = Modifier.onFocusChanged { onRowFocus(mine, it.hasFocus) }) {
-                    ContentRow(stringResource(R.string.home_my_movies), favMovies) { movie ->
+                    ContentRow(stringResource(R.string.home_my_movies), favMoviesShown) { movie ->
                         PosterCard(
                             title = displayName(movie.name),
                             image = movie.poster,
@@ -289,7 +295,7 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
 
             item {
                 Box(modifier = Modifier.onFocusChanged { onRowFocus(mine, it.hasFocus) }) {
-                    ContentRow(stringResource(R.string.home_my_series), favSeries) { series ->
+                    ContentRow(stringResource(R.string.home_my_series), favSeriesShown) { series ->
                         PosterCard(
                             title = displayName(series.name),
                             image = series.poster,
@@ -340,22 +346,6 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                 }
             }
         }
-    }
-
-    pendingResume?.let { item ->
-        ResumeDialog(
-            title = displayName(item.seriesName ?: item.title),
-            positionMs = item.position,
-            onResume = {
-                pendingResume = null
-                viewModel.resume(item)
-            },
-            onRestart = {
-                pendingResume = null
-                viewModel.resume(item, fromStart = true)
-            },
-            onDismiss = { pendingResume = null },
-        )
     }
 }
 
