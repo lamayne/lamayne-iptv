@@ -13,8 +13,8 @@ android {
         // Android 5.0 is the oldest version Android TV ever shipped with.
         minSdk = 21
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 7
+        versionName = "0.7.0"
     }
 
     buildTypes {

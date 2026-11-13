@@ -6,6 +6,8 @@ import android.content.ContextWrapper
 import android.net.Uri
 import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -29,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -54,12 +57,21 @@ private fun Context.findActivity(): Activity? {
 }
 
 @Composable
-private fun Group(title: String, content: @Composable () -> Unit) {
+private fun Group(title: String, focusable: Boolean = false, content: @Composable () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(20.dp)
+
+    // A block without a button can still take the cursor: that is what makes the list
+    // scroll down to it (the QR code was out of reach).
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(shape)
             .background(Panel)
+            .then(
+                if (focusable) Modifier.onFocusChanged { focused = it.isFocused }.focusable() else Modifier
+            )
+            .border(2.dp, if (focused) Accent else Color.Transparent, shape)
             .padding(22.dp),
     ) {
         Text(
@@ -263,7 +275,7 @@ fun SettingsTab(viewModel: MainViewModel) {
         }
 
         item {
-            Group(stringResource(R.string.settings_about)) {
+            Group(stringResource(R.string.settings_about), focusable = true) {
                 Text(
                     "LAMAYNE IPTV  " + stringResource(R.string.settings_version, version),
                     color = TextMain,
@@ -279,7 +291,7 @@ fun SettingsTab(viewModel: MainViewModel) {
         }
 
         item {
-            Group(stringResource(R.string.settings_support)) {
+            Group(stringResource(R.string.settings_support), focusable = true) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (qr != null) {
                         Image(

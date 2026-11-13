@@ -344,7 +344,7 @@ fun <T : Any> BrowsePage(
     var mode by remember {
         mutableStateOf(
             viewModel.browseMode(kind)?.let { BrowseMode.values().getOrNull(it) }
-                ?: if (favorites.isNotEmpty()) BrowseMode.FAVORITES else BrowseMode.CATEGORY
+                ?: BrowseMode.FAVORITES
         )
     }
 

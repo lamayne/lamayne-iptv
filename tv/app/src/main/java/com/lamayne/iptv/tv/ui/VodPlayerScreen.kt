@@ -560,6 +560,8 @@ private fun TrackPanel(
     modifier: Modifier = Modifier,
 ) {
     val first = remember { FocusRequester() }
+    var focusedIndex by remember { mutableStateOf(0) }
+    val total = options.size + (if (offLabel != null) 1 else 0)
 
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
 
@@ -569,7 +571,21 @@ private fun TrackPanel(
             .width(420.dp)
             .clip(RoundedCornerShape(22.dp))
             .background(Color(0xF013131F))
-            .padding(22.dp),
+            .padding(22.dp)
+            // The cursor stays inside the list: Down on the last line, Up on the first and
+            // left / right do nothing (before, they moved to the controls behind the list).
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) {
+                    false
+                } else {
+                    when (event.key) {
+                        Key.DirectionDown -> focusedIndex >= total - 1
+                        Key.DirectionUp -> focusedIndex <= 0
+                        Key.DirectionLeft, Key.DirectionRight -> true
+                        else -> false
+                    }
+                }
+            },
     ) {
         Text(title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
 
@@ -589,7 +605,7 @@ private fun TrackPanel(
             ) {
                 if (offLabel != null) {
                     item {
-                        TrackRow(offLabel, offSelected, true, first, onOff)
+                        TrackRow(offLabel, offSelected, true, first, onOff, onFocused = { focusedIndex = 0 })
                     }
                 }
 
@@ -600,6 +616,7 @@ private fun TrackPanel(
                         enabled = option.supported,
                         focusRequester = if (offLabel == null && index == 0) first else null,
                         onClick = { onPick(option) },
+                        onFocused = { focusedIndex = index + (if (offLabel != null) 1 else 0) },
                     )
                 }
             }
@@ -614,9 +631,11 @@ private fun TrackRow(
     enabled: Boolean,
     focusRequester: FocusRequester?,
     onClick: () -> Unit,
+    onFocused: () -> Unit = {},
 ) {
     FocusCard(
         onClick = { if (enabled) onClick() },
+        onFocused = onFocused,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         focusedScale = 1.02f,

@@ -28,6 +28,15 @@ import java.util.Date
 import java.util.Locale
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,27 +54,33 @@ fun MainScreen(viewModel: MainViewModel) {
 
     // A plain M3U playlist has no movies or series.
     val credentials by viewModel.credentials.collectAsStateWithLifecycle()
+    val featured by viewModel.featured.collectAsStateWithLifecycle()
     val tabs = Tab.values().filter { !(credentials?.isM3u == true && (it == Tab.MOVIES || it == Tab.SERIES)) }
+    val homeEntry = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
 
-    if (tab == Tab.HOME) {
-        // The home banner goes behind the menu.
-        Box(modifier = Modifier.fillMaxSize()) {
-            HomeTab(viewModel)
-
-            Box(modifier = Modifier.align(Alignment.TopStart)) {
-                TopBar(tab, tabs, overlay = true) { viewModel.selectTab(it) }
-            }
+    val goDown: () -> Unit = {
+        if (featured.isNotEmpty()) {
+            homeEntry.requestFocus()
+        } else {
+            focusManager.moveFocus(FocusDirection.Down)
         }
-    } else {
-        Column(modifier = Modifier.fillMaxSize()) {
-            TopBar(tab, tabs, overlay = false) { viewModel.selectTab(it) }
+    }
 
-            when (tab) {
-                Tab.LIVE -> LiveTab(viewModel)
-                Tab.MOVIES -> MoviesTab(viewModel)
-                Tab.SERIES -> SeriesTab(viewModel)
-                else -> SettingsTab(viewModel)
-            }
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopBar(
+            current = tab,
+            tabs = tabs,
+            // From the menu, Down goes straight to the Play button of the home page.
+            onDown = if (tab == Tab.HOME) goDown else null,
+        ) { viewModel.selectTab(it) }
+
+        when (tab) {
+            Tab.HOME -> HomeTab(viewModel, homeEntry)
+            Tab.LIVE -> LiveTab(viewModel)
+            Tab.MOVIES -> MoviesTab(viewModel)
+            Tab.SERIES -> SeriesTab(viewModel)
+            Tab.SETTINGS -> SettingsTab(viewModel)
         }
     }
 }
@@ -83,7 +98,7 @@ private fun labelOf(tab: Tab): String =
     )
 
 @Composable
-private fun TopBar(current: Tab, tabs: List<Tab>, overlay: Boolean, onSelect: (Tab) -> Unit) {
+private fun TopBar(current: Tab, tabs: List<Tab>, onDown: (() -> Unit)?, onSelect: (Tab) -> Unit) {
     val clock by produceState(initialValue = currentClock()) {
         while (true) {
             delay(15_000)
@@ -94,10 +109,14 @@ private fun TopBar(current: Tab, tabs: List<Tab>, overlay: Boolean, onSelect: (T
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (overlay) Modifier.background(Brush.verticalGradient(listOf(Color(0xD90A0A12), Color.Transparent)))
-                else Modifier
-            )
+            .onPreviewKeyEvent { event ->
+                if (onDown != null && event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown) {
+                    onDown()
+                    true
+                } else {
+                    false
+                }
+            }
             .padding(horizontal = 48.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
