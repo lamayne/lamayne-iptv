@@ -191,7 +191,9 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
 
                     // the chosen one stays in the list even if its categories were hidden since
-                    for (code in (availableLanguages + homeLanguage).filter { it != "auto" }.distinct()) {
+                    // French, English and Spanish are always offered (the synopsis decides), then the
+                    // other languages found in the categories, and the chosen one
+                    for (code in (listOf("fr", "en", "es") + availableLanguages + homeLanguage).filter { it != "auto" }.distinct()) {
                         Pill(
                             text = languageLabel(code),
                             selected = homeLanguage == code,

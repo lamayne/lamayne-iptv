@@ -23,6 +23,7 @@ import com.lamayne.iptv.tv.data.Loadable
 import com.lamayne.iptv.tv.data.M3U_USER
 import com.lamayne.iptv.tv.data.M3uClient
 import com.lamayne.iptv.tv.data.MediaInfo
+import com.lamayne.iptv.tv.data.PlotLanguage
 import com.lamayne.iptv.tv.data.isM3u
 import com.lamayne.iptv.tv.ui.channelName
 import com.lamayne.iptv.tv.data.MediaKind
@@ -1564,23 +1565,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _homeError.value = null
 
             try {
-                val tags = tagsFor(homeLanguageCode())
-                val movieCategory = pickLatest(XtreamClient.movieCategories(credentials), _hiddenMovies.value, tags)
-                val seriesCategory = pickLatest(XtreamClient.seriesCategories(credentials), _hiddenSeries.value, tags)
+                val target = homeLanguageCode()
+                // "Auto" falls back to what exists; a language chosen by hand never does.
+                val strict = settings.homeLanguage != "auto"
+
+                val movieCategories = XtreamClient.movieCategories(credentials)
+                val seriesCategories = XtreamClient.seriesCategories(credentials)
+                val movieCategory = chooseMovieCategory(credentials, movieCategories, _hiddenMovies.value, target, strict)
+                val seriesCategory = chooseSeriesCategory(credentials, seriesCategories, _hiddenSeries.value, target, strict)
 
                 val latestMovies = movieCategory
                     ?.let { recentMovies(XtreamClient.movies(credentials, it.id)) }
                     .orEmpty()
+                    .let { list -> keepLoadedPosters(list, { it.poster }, 20) }
 
                 _latestMovies.value = latestMovies
 
                 val latestSeries = seriesCategory
                     ?.let { recentSeries(XtreamClient.series(credentials, it.id)) }
                     .orEmpty()
+                    .let { list -> keepLoadedPosters(list, { it.poster }, 20) }
 
                 _latestSeries.value = latestSeries
 
-                buildFeatured(credentials, latestMovies, latestSeries)
+                buildFeatured(credentials, latestMovies, latestSeries, target, strict)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1591,13 +1599,148 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Up to 5 highlights, movie and series in turn. A highlight must have a SYNOPSIS and a
-    // PICTURE that really loads; the others are skipped and the next titles are tried
-    // (4 at a time). Each one appears as soon as it is ready.
+    // ---- which category is "the latest ones" in the chosen language
+
+    private val categoryLanguageCache = HashMap<String, String>()
+
+    private fun latestScore(name: String): Int {
+        val text = normalizeText(name)
+
+        return if (LATEST_WORDS.any { text.contains(it) }) 1 else 0
+    }
+
+    // 1. a category tagged with the language ("|EN| NEW RELEASES") is taken;
+    // 2. otherwise the synopses of a few titles of each category tell its language;
+    // 3. none found: "auto" takes the first category, a language chosen by hand shows nothing.
+    private suspend fun chooseMovieCategory(
+        credentials: Credentials,
+        categories: List<Category>,
+        hidden: Set<String>,
+        target: String,
+        strict: Boolean,
+    ): Category? {
+        val visible = categories.filter { it.id !in hidden }
+        val tags = tagsFor(target)
+
+        visible.filter { categoryTag(it.name) in tags }.maxByOrNull { latestScore(it.name) }?.let { return it }
+
+        val untagged = visible
+            .filter { categoryTag(it.name)?.let { tag -> languageOfTag(tag) } == null }
+            .sortedByDescending { latestScore(it.name) }
+            .take(8)
+        val sampled = coroutineScope {
+            untagged.map { category -> async { category to sampleMovieLanguage(credentials, category.id) } }.awaitAll()
+        }
+
+        sampled.firstOrNull { it.second == target }?.let { return it.first }
+
+        return if (strict) null else untagged.firstOrNull() ?: visible.firstOrNull()
+    }
+
+    private suspend fun chooseSeriesCategory(
+        credentials: Credentials,
+        categories: List<Category>,
+        hidden: Set<String>,
+        target: String,
+        strict: Boolean,
+    ): Category? {
+        val visible = categories.filter { it.id !in hidden }
+        val tags = tagsFor(target)
+
+        visible.filter { categoryTag(it.name) in tags }.maxByOrNull { latestScore(it.name) }?.let { return it }
+
+        val untagged = visible
+            .filter { categoryTag(it.name)?.let { tag -> languageOfTag(tag) } == null }
+            .sortedByDescending { latestScore(it.name) }
+            .take(8)
+        val sampled = coroutineScope {
+            untagged.map { category -> async { category to sampleSeriesLanguage(credentials, category.id) } }.awaitAll()
+        }
+
+        sampled.firstOrNull { it.second == target }?.let { return it.first }
+
+        return if (strict) null else untagged.firstOrNull() ?: visible.firstOrNull()
+    }
+
+    private suspend fun sampleMovieLanguage(credentials: Credentials, categoryId: String): String? {
+        categoryLanguageCache["M$categoryId"]?.let { return it.ifEmpty { null } }
+
+        return try {
+            val picks = XtreamClient.movies(credentials, categoryId)
+                .filter { !it.poster.isNullOrBlank() }
+                .sortedByDescending { it.added }
+                .take(4)
+            val plots = coroutineScope {
+                picks.map { movie -> async { movieInfoOf(credentials, movie.id)?.plot } }.awaitAll()
+            }
+            val language = PlotLanguage.majority(plots)
+
+            categoryLanguageCache["M$categoryId"] = language.orEmpty()
+            language
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private suspend fun sampleSeriesLanguage(credentials: Credentials, categoryId: String): String? {
+        categoryLanguageCache["S$categoryId"]?.let { return it.ifEmpty { null } }
+
+        return try {
+            val picks = XtreamClient.series(credentials, categoryId)
+                .filter { !it.poster.isNullOrBlank() }
+                .sortedByDescending { it.added }
+                .take(4)
+            val plots = coroutineScope {
+                picks.map { show ->
+                    async {
+                        try {
+                            infoSemaphore.withPermit { cachedSeriesInfo(credentials, show.id).info.plot }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                }.awaitAll()
+            }
+            val language = PlotLanguage.majority(plots)
+
+            categoryLanguageCache["S$categoryId"] = language.orEmpty()
+            language
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // Only the titles whose picture really loads are shown: no empty tile on the home page.
+    private suspend fun <T> keepLoadedPosters(items: List<T>, poster: (T) -> String?, limit: Int): List<T> {
+        val kept = ArrayList<T>()
+
+        for (group in items.chunked(6)) {
+            val loaded = coroutineScope { group.map { item -> async { imageLoads(poster(item)) } }.awaitAll() }
+
+            group.forEachIndexed { position, item -> if (loaded[position]) kept.add(item) }
+
+            if (kept.size >= limit) break
+        }
+
+        return kept.take(limit)
+    }
+
+    // Up to 5 highlights, movie and series in turn. A highlight must have a SYNOPSIS in the chosen
+    // language and a PICTURE that really loads; the others are skipped and the next titles are
+    // tried (4 at a time). Each one appears as soon as it is ready. If no title matches the
+    // language, "auto" shows the others rather than an empty page.
     private suspend fun buildFeatured(
         credentials: Credentials,
         latestMovies: List<Movie>,
         latestSeries: List<Series>,
+        target: String,
+        strict: Boolean,
     ) {
         val candidates = ArrayList<Any>()
 
@@ -1606,24 +1749,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             latestSeries.getOrNull(position)?.let { candidates.add(it) }
         }
 
-        val slides = ArrayList<Featured>()
+        val matching = ArrayList<Featured>()
+        val others = ArrayList<Featured>()
 
         for (group in candidates.chunked(4)) {
             val built = coroutineScope {
                 group.map { candidate -> async { buildSlide(credentials, candidate) } }.awaitAll()
             }
 
-            for (slide in built) {
-                if (slide != null && slides.size < 5) slides.add(slide)
+            for (pair in built) {
+                val (slide, language) = pair ?: continue
+
+                if (language == target) {
+                    if (matching.size < 5) matching.add(slide)
+                } else {
+                    others.add(slide)
+                }
             }
 
-            _featured.value = slides.toList()
+            _featured.value = matching.toList()
 
-            if (slides.size >= 5) break
+            if (matching.size >= 5) break
         }
+
+        if (matching.isEmpty() && !strict) _featured.value = others.take(5)
     }
 
-    private suspend fun buildSlide(credentials: Credentials, candidate: Any): Featured? =
+    // The slide and the language of its synopsis.
+    private suspend fun buildSlide(credentials: Credentials, candidate: Any): Pair<Featured, String?>? =
         try {
             when (candidate) {
                 is Movie -> {
@@ -1639,7 +1792,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             backdrop = image,
                             meta = metaOf(info, candidate.rating),
                             plot = info.plot,
-                        )
+                        ) to PlotLanguage.detect(info.plot)
                     } else {
                         null
                     }
@@ -1657,7 +1810,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             backdrop = image,
                             meta = metaOf(info, candidate.rating),
                             plot = info.plot,
-                        )
+                        ) to PlotLanguage.detect(info.plot)
                     } else {
                         null
                     }

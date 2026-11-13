@@ -77,12 +77,14 @@
     <string name="live_no_guide">Sin información de programación</string>
     <string name="login_connect">Conectar</string>
     <string name="login_connecting">Conectando…</string>
+    <string name="login_hide_pass">Ocultar contraseña</string>
     <string name="login_m3u_label">Enlace M3U (http…)</string>
     <string name="login_m3u_tip">Un enlace de tu proveedor. Si contiene una cuenta Xtream (get.php?username=…), todo funciona; una lista simple solo da TV en directo.</string>
     <string name="login_mode_m3u">Enlace M3U</string>
     <string name="login_mode_xtream">Cuenta Xtream</string>
     <string name="login_pass">Contraseña</string>
     <string name="login_server">Dirección del servidor, p. ej. http://host:8080</string>
+    <string name="login_show_pass">Mostrar contraseña</string>
     <string name="login_subtitle">Usa los datos de tu proveedor (Xtream Codes).</string>
     <string name="login_tip">Consejo: en la app Google TV del móvil, abre el mando y escribe con el teclado del teléfono.</string>
     <string name="login_title">Conecta tu cuenta IPTV</string>
@@ -139,7 +141,7 @@
     <string name="settings_on">Activado</string>
     <string name="settings_playback_history">Reproducción e historial</string>
     <string name="settings_reco">Recomendaciones del inicio</string>
-    <string name="settings_reco_hint">Idioma de las películas y series destacadas en el inicio. Solo se muestran los idiomas presentes en tus categorías visibles.</string>
+    <string name="settings_reco_hint">Idioma de las sinopsis de las películas y series destacadas en el inicio.</string>
     <string name="settings_refresh">Actualizar</string>
     <string name="settings_refresh_all">Actualizar todo</string>
     <string name="settings_refresh_guide">Guía</string>

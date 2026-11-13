@@ -128,11 +128,7 @@ fun LoginScreen(viewModel: MainViewModel) {
                     singleLine = true,
                     // dots instead of letters, unless the eye is pressed
                     visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { showPass = !showPass }) {
-                            EyeGlyph(open = showPass)
-                        }
-                    },
+
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done,
@@ -144,6 +140,11 @@ fun LoginScreen(viewModel: MainViewModel) {
                 )
             }
 
+
+                // The eye is a button of its own, right under the field: reachable with the remote.
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    EyeToggle(visible = showPass, onClick = { showPass = !showPass })
+                }
             } else {
                 OutlinedTextField(
                     value = m3u,

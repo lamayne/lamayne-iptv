@@ -77,12 +77,14 @@
     <string name="live_no_guide">No programme information</string>
     <string name="login_connect">Connect</string>
     <string name="login_connecting">Connecting...</string>
+    <string name="login_hide_pass">Hide password</string>
     <string name="login_m3u_label">M3U link (http…)</string>
     <string name="login_m3u_tip">A link from your provider. If it carries an Xtream account (get.php?username=…), everything works; a plain playlist gives Live TV only.</string>
     <string name="login_mode_m3u">M3U link</string>
     <string name="login_mode_xtream">Xtream account</string>
     <string name="login_pass">Password</string>
     <string name="login_server">Server address, e.g. http://host:8080</string>
+    <string name="login_show_pass">Show password</string>
     <string name="login_subtitle">Use the details your provider gave you (Xtream Codes).</string>
     <string name="login_tip">Tip: in the Google TV phone app, open the remote and type with your phone keyboard.</string>
     <string name="login_title">Connect your IPTV account</string>
@@ -139,7 +141,7 @@
     <string name="settings_on">On</string>
     <string name="settings_playback_history">Playback and history</string>
     <string name="settings_reco">Home recommendations</string>
-    <string name="settings_reco_hint">Language of the movies and series put forward on the home page. Only the languages found in your visible categories are listed.</string>
+    <string name="settings_reco_hint">Language of the synopses of the movies and series put forward on the home page.</string>
     <string name="settings_refresh">Update</string>
     <string name="settings_refresh_all">Update all</string>
     <string name="settings_refresh_guide">Guide</string>
