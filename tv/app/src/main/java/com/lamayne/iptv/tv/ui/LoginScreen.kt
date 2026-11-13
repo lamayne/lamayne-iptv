@@ -19,11 +19,18 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
@@ -51,6 +58,7 @@ fun LoginScreen(viewModel: MainViewModel) {
     var mode by rememberSaveable { mutableStateOf(0) }
     var m3u by rememberSaveable { mutableStateOf("") }
     var showPass by rememberSaveable { mutableStateOf(false) }
+    val eyeFocus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -121,30 +129,40 @@ fun LoginScreen(viewModel: MainViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                OutlinedTextField(
-                    value = pass,
-                    onValueChange = { pass = it },
-                    label = { Text(stringResource(R.string.login_pass)) },
-                    singleLine = true,
-                    // dots instead of letters, unless the eye is pressed
-                    visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
+                // The password and its eye side by side: Right on the field goes to the eye.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = pass,
+                        onValueChange = { pass = it },
+                        label = { Text(stringResource(R.string.login_pass)) },
+                        singleLine = true,
+                        // dots instead of letters, unless the eye is pressed
+                        visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = { focusManager.moveFocus(FocusDirection.Down) },
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .onPreviewKeyEvent { event ->
+                                // a text field keeps the arrows for its cursor: this one gives way
+                                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionRight) {
+                                    runCatching { eyeFocus.requestFocus() }
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
+                    )
 
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done,
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = { focusManager.moveFocus(FocusDirection.Down) },
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+                    Spacer(Modifier.width(10.dp))
 
-
-                // The eye is a button of its own, right under the field: reachable with the remote.
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    EyeToggle(visible = showPass, onClick = { showPass = !showPass })
+                    EyeButton(visible = showPass, focusRequester = eyeFocus, onClick = { showPass = !showPass })
                 }
+            }
             } else {
                 OutlinedTextField(
                     value = m3u,

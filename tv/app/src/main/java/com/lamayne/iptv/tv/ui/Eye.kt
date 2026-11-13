@@ -1,6 +1,9 @@
 package com.lamayne.iptv.tv.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import com.lamayne.iptv.tv.R
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
@@ -56,34 +59,22 @@ fun EyeGlyph(open: Boolean, color: Color = Color(0xFFB8B8CC), glyphSize: Dp = 26
     }
 }
 
-// The "show / hide the password" button. It sits under the field and has its own place in
-// the order of the remote: an icon inside the text field could not be reached (Right moves
-// the cursor in the text).
+// The small eye on the right of the password field: only the icon, a button of its own that
+// the remote can select (Right on the field jumps to it).
 @Composable
-fun EyeToggle(visible: Boolean, onClick: () -> Unit) {
+fun EyeButton(visible: Boolean, focusRequester: FocusRequester, onClick: () -> Unit) {
     FocusCard(
         onClick = onClick,
-        shape = RoundedCornerShape(50),
+        modifier = Modifier.size(56.dp),
+        shape = RoundedCornerShape(14.dp),
         container = Color(0x22FFFFFF),
         focusedContainer = Color(0x55FFFFFF),
         borderColor = Color.White,
-        focusedScale = 1.05f,
+        focusedScale = 1.06f,
+        focusRequester = focusRequester,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            EyeGlyph(open = visible, color = Color.White, glyphSize = 22.dp)
-
-            Spacer(Modifier.width(10.dp))
-
-            Text(
-                stringResource(if (visible) R.string.login_hide_pass else R.string.login_show_pass),
-                color = Color.White,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-            )
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EyeGlyph(open = visible, color = Color.White, glyphSize = 26.dp)
         }
     }
 }

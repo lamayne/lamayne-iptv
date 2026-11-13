@@ -77,14 +77,12 @@
     <string name="live_no_guide">Sin información de programación</string>
     <string name="login_connect">Conectar</string>
     <string name="login_connecting">Conectando…</string>
-    <string name="login_hide_pass">Ocultar contraseña</string>
     <string name="login_m3u_label">Enlace M3U (http…)</string>
     <string name="login_m3u_tip">Un enlace de tu proveedor. Si contiene una cuenta Xtream (get.php?username=…), todo funciona; una lista simple solo da TV en directo.</string>
     <string name="login_mode_m3u">Enlace M3U</string>
     <string name="login_mode_xtream">Cuenta Xtream</string>
     <string name="login_pass">Contraseña</string>
     <string name="login_server">Dirección del servidor, p. ej. http://host:8080</string>
-    <string name="login_show_pass">Mostrar contraseña</string>
     <string name="login_subtitle">Usa los datos de tu proveedor (Xtream Codes).</string>
     <string name="login_tip">Consejo: en la app Google TV del móvil, abre el mando y escribe con el teclado del teléfono.</string>
     <string name="login_title">Conecta tu cuenta IPTV</string>
