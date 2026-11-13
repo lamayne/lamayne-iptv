@@ -26,6 +26,7 @@ import com.lamayne.iptv.tv.data.MediaKind
 fun MoviesTab(viewModel: MainViewModel) {
     val hidden by viewModel.hiddenMovies.collectAsStateWithLifecycle()
     val favorites by viewModel.favMovies.collectAsStateWithLifecycle()
+    val recent by viewModel.recentMovies.collectAsStateWithLifecycle()
     val results by viewModel.searchMovies.collectAsStateWithLifecycle()
     val progress by viewModel.progress.collectAsStateWithLifecycle()
     val favoriteIds = remember(favorites) { favorites.map { it.id }.toSet() }
@@ -39,6 +40,7 @@ fun MoviesTab(viewModel: MainViewModel) {
         controller = viewModel.movies,
         hidden = hidden,
         favorites = favorites,
+        recent = recent,
         searchResults = results,
         idOf = { it.id },
         categoryIdOf = { it.categoryId },
@@ -104,6 +106,7 @@ fun MoviesTab(viewModel: MainViewModel) {
 fun SeriesTab(viewModel: MainViewModel) {
     val hidden by viewModel.hiddenSeries.collectAsStateWithLifecycle()
     val favorites by viewModel.favSeries.collectAsStateWithLifecycle()
+    val recent by viewModel.recentSeries.collectAsStateWithLifecycle()
     val results by viewModel.searchSeries.collectAsStateWithLifecycle()
     val favoriteIds = remember(favorites) { favorites.map { it.id }.toSet() }
 
@@ -113,6 +116,7 @@ fun SeriesTab(viewModel: MainViewModel) {
         controller = viewModel.series,
         hidden = hidden,
         favorites = favorites,
+        recent = recent,
         searchResults = results,
         idOf = { it.id },
         categoryIdOf = { it.categoryId },

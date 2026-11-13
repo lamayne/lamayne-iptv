@@ -32,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -122,8 +123,10 @@ fun LoginScreen(viewModel: MainViewModel) {
                     onValueChange = { pass = it },
                     label = { Text(stringResource(R.string.login_pass)) },
                     singleLine = true,
+                    // dots instead of letters: the password is not shown on the TV
+                    visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Ascii,
+                        keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done,
                     ),
                     keyboardActions = KeyboardActions(

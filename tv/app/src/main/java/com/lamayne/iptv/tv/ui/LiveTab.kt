@@ -23,6 +23,7 @@ fun LiveTab(viewModel: MainViewModel) {
     val hidden by viewModel.hiddenLive.collectAsStateWithLifecycle()
     val epgMap by viewModel.epgMap.collectAsStateWithLifecycle()
     val favorites by viewModel.favChannels.collectAsStateWithLifecycle()
+    val recent by viewModel.recentChannels.collectAsStateWithLifecycle()
     val results by viewModel.searchChannels.collectAsStateWithLifecycle()
     val favoriteIds = remember(favorites) { favorites.map { it.id }.toSet() }
     val epgVersion by viewModel.epgVersion.collectAsStateWithLifecycle()
@@ -33,6 +34,7 @@ fun LiveTab(viewModel: MainViewModel) {
         controller = viewModel.live,
         hidden = hidden,
         favorites = favorites,
+        recent = recent,
         searchResults = results,
         idOf = { it.id },
         categoryIdOf = { it.categoryId },

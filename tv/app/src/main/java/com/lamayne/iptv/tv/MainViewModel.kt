@@ -57,6 +57,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.text.Normalizer
+import java.util.Calendar
 import java.util.Locale
 import kotlin.math.abs
 
@@ -157,6 +158,37 @@ private fun pickLatest(categories: List<Category>, hidden: Set<String>, tags: Se
     } ?: pool.firstOrNull()
 }
 
+// The "latest" row of the home page: what CAME OUT recently comes first. A title whose year
+// is known and old (a 2018 film put in a "new" category) is left out; the others are sorted
+// by the date they were added.
+private fun recentMovies(items: List<Movie>): List<Movie> {
+    val thisYear = Calendar.getInstance().get(Calendar.YEAR)
+
+    return items
+        .filter { (it.year ?: thisYear) >= thisYear - 2 }
+        .sortedWith(
+            compareByDescending<Movie> { (it.year ?: 0) >= thisYear - 1 }
+                .thenByDescending { it.added }
+        )
+        .take(24)
+}
+
+private fun recentSeries(items: List<Series>): List<Series> {
+    val thisYear = Calendar.getInstance().get(Calendar.YEAR)
+
+    return items
+        .filter { (it.year ?: thisYear) >= thisYear - 2 }
+        .sortedWith(
+            compareByDescending<Series> { (it.year ?: 0) >= thisYear - 1 }
+                .thenByDescending { it.added }
+        )
+        .take(24)
+}
+
+// The home page is rebuilt at every launch, and again when it is opened more than 6 hours
+// after the last time (or with "Update all").
+private const val HOME_REFRESH_MS = 6 * 60 * 60 * 1000L
+
 private fun metaOf(info: MediaInfo, fallbackRating: String?): String {
     val rating = (info.rating ?: fallbackRating)
         ?.toDoubleOrNull()
@@ -177,6 +209,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val favChannelStore = JsonListStore(application, "fav_", 500, ::channelToJson, ::channelFromJson)
     private val favMovieStore = JsonListStore(application, "favm_", 500, ::movieToJson, ::movieFromJson)
     private val favSeriesStore = JsonListStore(application, "favs_", 500, ::seriesToJson, ::seriesFromJson)
+    private val recentChannelStore = JsonListStore(application, "recent_", 30, ::channelToJson, ::channelFromJson)
+    private val recentMovieStore = JsonListStore(application, "recentm_", 30, ::movieToJson, ::movieFromJson)
+    private val recentSeriesStore = JsonListStore(application, "recents_", 30, ::seriesToJson, ::seriesFromJson)
     private val progressStore = JsonListStore(application, "progress_", 150, ::progressToJson, ::progressFromJson)
 
     // ------------------------------------------------------------------ account
@@ -242,6 +277,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _favSeries = MutableStateFlow<List<Series>>(emptyList())
     val favSeries: StateFlow<List<Series>> = _favSeries.asStateFlow()
+
+    // What was watched last, for the "Recently watched" entry of Live TV, Movies and Series.
+    private val _recentChannels = MutableStateFlow<List<Channel>>(emptyList())
+    val recentChannels: StateFlow<List<Channel>> = _recentChannels.asStateFlow()
+
+    private val _recentMovies = MutableStateFlow<List<Movie>>(emptyList())
+    val recentMovies: StateFlow<List<Movie>> = _recentMovies.asStateFlow()
+
+    private val _recentSeries = MutableStateFlow<List<Series>>(emptyList())
+    val recentSeries: StateFlow<List<Series>> = _recentSeries.asStateFlow()
 
     private val _progress = MutableStateFlow<List<WatchProgress>>(emptyList())
     val progress: StateFlow<List<WatchProgress>> = _progress.asStateFlow()
@@ -391,6 +436,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val filmographyCache = HashMap<String, Filmography.Result>()
 
     private var homeJob: Job? = null
+    private var lastHomeLoad = 0L
     private var playingEpgJob: Job? = null
     private var searchJob: Job? = null
     private var infoJob: Job? = null
@@ -410,15 +456,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ------------------------------------------------------------------ account
 
-    // Typing a long address with a remote is painful. For testing, the account
-    // can be given from a computer: adb shell am start -n
-    // com.lamayne.iptv.tv/.MainActivity --es server ... --es user ... --es pass ...
-    fun loginFromIntent(server: String?, user: String?, pass: String?) {
-        if (_credentials.value == null && server != null && user != null && pass != null) {
-            login(server, user, pass)
-        }
-    }
-
     fun login(serverRaw: String, user: String, pass: String) {
         val server = XtreamClient.normalizeServer(serverRaw)
 
@@ -427,21 +464,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        val credentials = Credentials(server, user.trim(), pass)
+        // Without "http://" or "https://" typed, the secure address is tried first and the plain
+        // one only if the server does not speak https.
+        val typed = serverRaw.trim()
+        val explicit = typed.startsWith("http://", ignoreCase = true) || typed.startsWith("https://", ignoreCase = true)
+        val candidates = if (explicit) listOf(server) else listOf("https://" + server.removePrefix("http://"), server)
 
         viewModelScope.launch {
             _loginBusy.value = true
             _loginError.value = null
 
             try {
-                XtreamClient.authenticate(credentials)
-                credentialStore.save(credentials)
-                _credentials.value = credentials
-                startSession(credentials)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _loginError.value = toUiError(e)
+                var failure: Exception? = null
+
+                for (candidate in candidates) {
+                    val credentials = Credentials(candidate, user.trim(), pass)
+
+                    try {
+                        XtreamClient.authenticate(credentials)
+                        credentialStore.save(credentials)
+                        _credentials.value = credentials
+                        startSession(credentials)
+                        return@launch
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: XtreamClient.AuthException) {
+                        // the server answered: wrong user or password, no need to try the other address
+                        failure = e
+                        break
+                    } catch (e: Exception) {
+                        failure = e
+                    }
+                }
+
+                failure?.let { _loginError.value = toUiError(it) }
             } finally {
                 _loginBusy.value = false
             }
@@ -507,6 +563,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _favMovies.value = emptyList()
         _favSeries.value = emptyList()
         _progress.value = emptyList()
+        _recentChannels.value = emptyList()
+        _recentMovies.value = emptyList()
+        _recentSeries.value = emptyList()
         _featured.value = emptyList()
         _latestMovies.value = emptyList()
         _latestSeries.value = emptyList()
@@ -538,6 +597,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _favMovies.value = favMovieStore.load(credentials)
         _favSeries.value = favSeriesStore.load(credentials)
         _progress.value = progressStore.load(credentials)
+        _recentChannels.value = recentChannelStore.load(credentials)
+        _recentMovies.value = recentMovieStore.load(credentials)
+        _recentSeries.value = recentSeriesStore.load(credentials)
         _hiddenLive.value = settings.hidden(credentials, MediaKind.LIVE)
         _hiddenMovies.value = settings.hidden(credentials, MediaKind.MOVIE)
         _hiddenSeries.value = settings.hidden(credentials, MediaKind.SERIES)
@@ -607,6 +669,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         when (tab) {
             Tab.MOVIES -> if (!movies.started) movies.start(credentials)
             Tab.SERIES -> if (!series.started) series.start(credentials)
+            Tab.HOME -> if (System.currentTimeMillis() - lastHomeLoad > HOME_REFRESH_MS) loadHome(credentials)
             else -> Unit
         }
     }
@@ -932,11 +995,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         announce(series.name, updated.any { it.id == series.id })
     }
 
+    private fun rememberRecent(channel: Channel) {
+        val credentials = _credentials.value ?: return
+        val updated = (listOf(channel) + _recentChannels.value.filterNot { it.id == channel.id }).take(30)
+
+        _recentChannels.value = updated
+        recentChannelStore.save(credentials, updated)
+    }
+
+    private fun rememberRecent(movie: Movie) {
+        val credentials = _credentials.value ?: return
+        val updated = (listOf(movie) + _recentMovies.value.filterNot { it.id == movie.id }).take(30)
+
+        _recentMovies.value = updated
+        recentMovieStore.save(credentials, updated)
+    }
+
+    private fun rememberRecent(series: Series) {
+        val credentials = _credentials.value ?: return
+        val updated = (listOf(series) + _recentSeries.value.filterNot { it.id == series.id }).take(30)
+
+        _recentSeries.value = updated
+        recentSeriesStore.save(credentials, updated)
+    }
+
     fun clearProgress() {
         val credentials = _credentials.value ?: return
 
         _progress.value = emptyList()
         progressStore.save(credentials, emptyList())
+        _recentChannels.value = emptyList()
+        _recentMovies.value = emptyList()
+        _recentSeries.value = emptyList()
+        recentChannelStore.save(credentials, emptyList())
+        recentMovieStore.save(credentials, emptyList())
+        recentSeriesStore.save(credentials, emptyList())
     }
 
     // ------------------------------------------------------------------ live playback
@@ -965,6 +1058,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startLive(channel: Channel) {
+        rememberRecent(channel)
         _playing.value = channel
         _playingEpg.value = null
         playingEpgJob?.cancel()
@@ -1033,6 +1127,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playMovie(movie: Movie, resume: Boolean) {
+        rememberRecent(movie)
         val saved = progressFor(MediaKind.MOVIE, movie.id)
         val start = if (resume && saved != null && saved.inProgress) saved.position else 0L
 
@@ -1053,6 +1148,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playEpisode(series: Series, episode: Episode, resume: Boolean) {
+        rememberRecent(series)
         val saved = progressFor(MediaKind.EPISODE, episode.id)
         val start = if (resume && saved != null && saved.inProgress) saved.position else 0L
 
@@ -1082,6 +1178,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // "Continue watching" on the home page: back into the picture, where it stopped
     // or from the start.
     fun resume(progress: WatchProgress, fromStart: Boolean = false) {
+        // The same history as when it was started from a list.
+        if (progress.kind == MediaKind.MOVIE) {
+            rememberRecent(Movie(progress.id, progress.title, progress.image, null, progress.ext, null, 0L))
+        } else {
+            val seriesId = progress.seriesId
+
+            if (seriesId != null) {
+                rememberRecent(Series(seriesId, progress.seriesName ?: progress.title, progress.image, null, null, 0L))
+            }
+        }
+
         push(
             Route.PlayVod(
                 VodRequest(
@@ -1176,6 +1283,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // A plain playlist has no movies or series: nothing to suggest.
         if (credentials.isM3u) return
 
+        lastHomeLoad = System.currentTimeMillis()
+
         homeJob?.cancel()
         homeJob = viewModelScope.launch {
             _homeLoading.value = true
@@ -1187,13 +1296,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val seriesCategory = pickLatest(XtreamClient.seriesCategories(credentials), _hiddenSeries.value, tags)
 
                 val latestMovies = movieCategory
-                    ?.let { XtreamClient.movies(credentials, it.id).sortedByDescending { m -> m.added }.take(24) }
+                    ?.let { recentMovies(XtreamClient.movies(credentials, it.id)) }
                     .orEmpty()
 
                 _latestMovies.value = latestMovies
 
                 val latestSeries = seriesCategory
-                    ?.let { XtreamClient.series(credentials, it.id).sortedByDescending { s -> s.added }.take(24) }
+                    ?.let { recentSeries(XtreamClient.series(credentials, it.id)) }
                     .orEmpty()
 
                 _latestSeries.value = latestSeries

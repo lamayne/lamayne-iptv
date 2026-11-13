@@ -457,6 +457,7 @@ object XtreamClient {
         var ext: String? = null
         var rating: String? = null
         var added = 0L
+        var yearField: String? = null
 
         reader.beginObject()
 
@@ -469,6 +470,7 @@ object XtreamClient {
                 "container_extension" -> ext = reader.textOrNull()
                 "rating" -> rating = reader.textOrNull()
                 "added" -> added = reader.textOrNull()?.toLongOrNull() ?: 0L
+                "year", "releasedate", "release_date", "releaseDate" -> if (yearField == null) yearField = reader.textOrNull() else reader.skipValue()
                 else -> reader.skipValue()
             }
         }
@@ -486,6 +488,7 @@ object XtreamClient {
             ext = ext?.takeIf { it.isNotBlank() } ?: "mp4",
             rating = rating?.takeIf { it.isNotBlank() },
             added = added,
+            year = Years.from(label, yearField),
         )
     }
 
@@ -501,6 +504,7 @@ object XtreamClient {
         var categoryId: String? = null
         var rating: String? = null
         var added = 0L
+        var yearField: String? = null
 
         reader.beginObject()
 
@@ -512,6 +516,7 @@ object XtreamClient {
                 "category_id" -> categoryId = reader.textOrNull()
                 "rating" -> rating = reader.textOrNull()
                 "last_modified" -> added = reader.textOrNull()?.toLongOrNull() ?: 0L
+                "year", "releasedate", "release_date", "releaseDate" -> if (yearField == null) yearField = reader.textOrNull() else reader.skipValue()
                 else -> reader.skipValue()
             }
         }
@@ -528,6 +533,7 @@ object XtreamClient {
             categoryId = categoryId,
             rating = rating?.takeIf { it.isNotBlank() },
             added = added,
+            year = Years.from(label, yearField),
         )
     }
 

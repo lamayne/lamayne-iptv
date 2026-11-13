@@ -6,7 +6,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import com.lamayne.iptv.tv.data.CrashLog
 import com.lamayne.iptv.tv.ui.LamayneApp
 import com.lamayne.iptv.tv.ui.LamayneTheme
 import java.util.Locale
@@ -38,16 +37,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        CrashLog.install(this)
         super.onCreate(savedInstanceState)
 
-        if (savedInstanceState == null) {
-            viewModel.loginFromIntent(
-                intent?.getStringExtra("server"),
-                intent?.getStringExtra("user"),
-                intent?.getStringExtra("pass"),
-            )
-        }
+        // A crash report written by a previous version is erased.
+        java.io.File(filesDir, "last-crash.txt").delete()
 
         setContent {
             LamayneTheme {

@@ -270,21 +270,24 @@ fun WideCard(
                 }
             }
 
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Column(modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 7.dp)) {
                 Text(
                     title,
                     color = TextMain,
-                    fontSize = 14.sp,
+                    fontSize = 12.sp,
+                    lineHeight = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
 
                 if (subtitle != null) {
+                    // right under the title: no gap between the two lines
                     Text(
                         subtitle,
                         color = Muted,
-                        fontSize = 12.sp,
+                        fontSize = 10.sp,
+                        lineHeight = 12.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

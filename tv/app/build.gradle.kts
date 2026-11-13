@@ -10,11 +10,11 @@ android {
 
     defaultConfig {
         applicationId = "com.lamayne.iptv.tv"
-        // Android 5.0 is the oldest version Android TV ever shipped with.
-        minSdk = 21
+        // Android 6.0: the oldest version with the encrypted key storage (Keystore AES-GCM).
+        minSdk = 23
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.8.2"
+        versionCode = 12
+        versionName = "0.9.1"
     }
 
     buildTypes {

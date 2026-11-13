@@ -62,6 +62,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.ui.PlayerView
 import com.lamayne.iptv.tv.R
+import com.lamayne.iptv.tv.data.Secrets
 import com.lamayne.iptv.tv.data.MediaKind
 import com.lamayne.iptv.tv.data.VodRequest
 import kotlinx.coroutines.delay
@@ -137,7 +138,7 @@ fun VodPlayerScreen(
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                failure = "${error.errorCodeName}: ${error.message ?: ""}"
+                failure = Secrets.redact("${error.errorCodeName}: ${error.message ?: ""}")
             }
 
             override fun onTracksChanged(newTracks: Tracks) {

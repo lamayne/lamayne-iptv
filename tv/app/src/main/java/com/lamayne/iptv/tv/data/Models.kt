@@ -6,7 +6,10 @@ data class Credentials(
     val server: String,
     val user: String,
     val pass: String,
-)
+) {
+    // never prints the password (a log or an error message cannot leak it)
+    override fun toString(): String = "Credentials(server=$server, user=***, pass=***)"
+}
 
 // A plain M3U playlist is stored as an account whose address is the link of the playlist.
 const val M3U_USER = "m3u"
@@ -36,6 +39,7 @@ data class Movie(
     val ext: String,
     val rating: String?,
     val added: Long,
+    val year: Int? = null,
 )
 
 data class Series(
@@ -45,6 +49,7 @@ data class Series(
     val categoryId: String?,
     val rating: String?,
     val added: Long,
+    val year: Int? = null,
 )
 
 // What the provider knows about a movie or a series.

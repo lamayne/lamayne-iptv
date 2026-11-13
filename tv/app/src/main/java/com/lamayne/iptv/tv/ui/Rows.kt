@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -264,7 +265,7 @@ fun SearchRow(
 }
 
 // What the right side of a Live TV, Movies or Series page shows.
-enum class BrowseMode { FAVORITES, SEARCH, CATEGORY }
+enum class BrowseMode { FAVORITES, SEARCH, CATEGORY, RECENT }
 
 @Composable
 private fun SpecialRow(
@@ -307,6 +308,7 @@ fun CategoryPanel(
     selectedId: String?,
     onFavorites: () -> Unit,
     onSearch: () -> Unit,
+    onRecent: () -> Unit,
     onSelect: (Category) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -331,6 +333,22 @@ fun CategoryPanel(
         LazyColumn(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             item {
                 SpecialRow(
+                    label = stringResource(R.string.browse_search),
+                    icon = {
+                        Icon(
+                            Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = AccentBright,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    selected = mode == BrowseMode.SEARCH,
+                    onClick = onSearch,
+                )
+            }
+
+            item {
+                SpecialRow(
                     label = stringResource(R.string.browse_favorites),
                     icon = {
                         Icon(
@@ -347,17 +365,17 @@ fun CategoryPanel(
 
             item {
                 SpecialRow(
-                    label = stringResource(R.string.browse_search),
+                    label = stringResource(R.string.browse_recent),
                     icon = {
                         Icon(
-                            Icons.Filled.Search,
+                            Icons.Filled.PlayArrow,
                             contentDescription = null,
                             tint = AccentBright,
                             modifier = Modifier.size(18.dp),
                         )
                     },
-                    selected = mode == BrowseMode.SEARCH,
-                    onClick = onSearch,
+                    selected = mode == BrowseMode.RECENT,
+                    onClick = onRecent,
                 )
             }
 
@@ -429,6 +447,7 @@ fun <T : Any> BrowsePage(
     controller: BrowseController<T>,
     hidden: Set<String>,
     favorites: List<T>,
+    recent: List<T>,
     searchResults: List<T>,
     idOf: (T) -> String,
     categoryIdOf: (T) -> String?,
@@ -462,6 +481,7 @@ fun <T : Any> BrowsePage(
 
     val shown = when (mode) {
         BrowseMode.FAVORITES -> favorites
+        BrowseMode.RECENT -> recent
         BrowseMode.SEARCH -> searchResults
         BrowseMode.CATEGORY -> items
     }
@@ -501,6 +521,7 @@ fun <T : Any> BrowsePage(
             mode = mode,
             selectedId = selected?.id,
             onFavorites = { changeMode(BrowseMode.FAVORITES) },
+            onRecent = { changeMode(BrowseMode.RECENT) },
             onSearch = {
                 changeMode(BrowseMode.SEARCH)
                 viewModel.beginSearch(kind)
@@ -515,6 +536,7 @@ fun <T : Any> BrowsePage(
         Column(modifier = Modifier.weight(1f)) {
             val title = when (mode) {
                 BrowseMode.FAVORITES -> stringResource(R.string.browse_favorites)
+                BrowseMode.RECENT -> stringResource(R.string.browse_recent)
                 BrowseMode.SEARCH -> stringResource(R.string.browse_search)
                 BrowseMode.CATEGORY -> selected?.name?.trim() ?: stringResource(panelTitle)
             }
@@ -557,6 +579,10 @@ fun <T : Any> BrowsePage(
                     BrowseMode.FAVORITES -> MessageBlock(
                         stringResource(R.string.fav_empty_title),
                         stringResource(R.string.fav_empty_hint),
+                    )
+                    BrowseMode.RECENT -> MessageBlock(
+                        stringResource(R.string.recent_empty_title),
+                        stringResource(R.string.recent_empty_hint),
                     )
                     BrowseMode.SEARCH -> when {
                         query.trim().length < 2 -> MessageBlock(

@@ -43,7 +43,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lamayne.iptv.tv.MainViewModel
 import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.data.AccountInfo
-import com.lamayne.iptv.tv.data.CrashLog
 import com.lamayne.iptv.tv.data.MediaKind
 import java.net.URI
 import java.text.DateFormat
@@ -105,7 +104,6 @@ fun SettingsTab(viewModel: MainViewModel) {
     val cleared = stringResource(R.string.settings_cleared)
     val subscription by viewModel.accountInfo.collectAsStateWithLifecycle()
     val smooth by viewModel.tunneling.collectAsStateWithLifecycle()
-    var crash by remember { mutableStateOf(CrashLog.read(context)) }
 
     // The subscription (days left) is asked each time Settings opens.
     LaunchedEffect(Unit) { viewModel.loadAccountInfo() }
@@ -125,6 +123,7 @@ fun SettingsTab(viewModel: MainViewModel) {
         contentPadding = PaddingValues(top = 4.dp, bottom = 48.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        // 1. Language (the movies and series on the home page follow it)
         item {
             Group(stringResource(R.string.settings_language)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -157,21 +156,8 @@ fun SettingsTab(viewModel: MainViewModel) {
             }
         }
 
-        item {
-            Group(stringResource(R.string.settings_playback)) {
-                ActionButton(
-                    text = stringResource(R.string.settings_smooth) + ": " +
-                        stringResource(if (smooth) R.string.settings_on else R.string.settings_off),
-                    onClick = { viewModel.toggleTunneling() },
-                    primary = smooth,
-                )
 
-                Spacer(Modifier.height(10.dp))
-
-                Text(stringResource(R.string.settings_smooth_hint), color = Muted, fontSize = 14.sp)
-            }
-        }
-
+        // 2. Account: who is signed in and how many days are left
         item {
             Group(stringResource(R.string.settings_account)) {
                 val account = credentials
@@ -196,6 +182,12 @@ fun SettingsTab(viewModel: MainViewModel) {
                     SubscriptionLines(plan)
                 }
 
+                // An address in http: the password travels in clear on the network.
+                if (credentials?.server?.startsWith("http://", ignoreCase = true) == true) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.account_not_encrypted), color = Color(0xFFFBBF24), fontSize = 13.sp)
+                }
+
                 Spacer(Modifier.height(14.dp))
 
                 ActionButton(
@@ -205,33 +197,8 @@ fun SettingsTab(viewModel: MainViewModel) {
             }
         }
 
-        item {
-            Group(stringResource(R.string.settings_visible)) {
-                Text(
-                    stringResource(R.string.settings_visible_hint),
-                    color = Muted,
-                    fontSize = 15.sp,
-                )
 
-                Spacer(Modifier.height(14.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ActionButton(
-                        text = stringResource(R.string.live_categories),
-                        onClick = { viewModel.openManageCategories(MediaKind.LIVE) },
-                    )
-                    ActionButton(
-                        text = stringResource(R.string.movies_categories),
-                        onClick = { viewModel.openManageCategories(MediaKind.MOVIE) },
-                    )
-                    ActionButton(
-                        text = stringResource(R.string.series_categories),
-                        onClick = { viewModel.openManageCategories(MediaKind.SERIES) },
-                    )
-                }
-            }
-        }
-
+        // 3. Update: "update everything" first
         item {
             Group(stringResource(R.string.settings_refresh)) {
                 Text(stringResource(R.string.settings_refresh_hint), color = Muted, fontSize = 15.sp)
@@ -239,6 +206,14 @@ fun SettingsTab(viewModel: MainViewModel) {
                 Spacer(Modifier.height(14.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ActionButton(
+                        text = stringResource(R.string.settings_refresh_all),
+                        primary = true,
+                        onClick = {
+                            viewModel.refreshAll()
+                            refreshMessage = refreshing
+                        },
+                    )
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_live),
                         onClick = {
@@ -267,14 +242,6 @@ fun SettingsTab(viewModel: MainViewModel) {
                             refreshMessage = refreshing
                         },
                     )
-                    ActionButton(
-                        text = stringResource(R.string.settings_refresh_all),
-                        primary = true,
-                        onClick = {
-                            viewModel.refreshAll()
-                            refreshMessage = refreshing
-                        },
-                    )
                 }
 
                 val note = refreshMessage
@@ -286,9 +253,41 @@ fun SettingsTab(viewModel: MainViewModel) {
             }
         }
 
+        // 4. Content and playback: visible categories; then 4K mode and clear history side by side
         item {
-            Group(stringResource(R.string.settings_data)) {
+            Group(stringResource(R.string.settings_content)) {
+                Text(
+                    stringResource(R.string.settings_visible_hint),
+                    color = Muted,
+                    fontSize = 15.sp,
+                )
+
+                Spacer(Modifier.height(14.dp))
+
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ActionButton(
+                        text = stringResource(R.string.live_categories),
+                        onClick = { viewModel.openManageCategories(MediaKind.LIVE) },
+                    )
+                    ActionButton(
+                        text = stringResource(R.string.movies_categories),
+                        onClick = { viewModel.openManageCategories(MediaKind.MOVIE) },
+                    )
+                    ActionButton(
+                        text = stringResource(R.string.series_categories),
+                        onClick = { viewModel.openManageCategories(MediaKind.SERIES) },
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ActionButton(
+                        text = stringResource(R.string.settings_smooth) + ": " +
+                            stringResource(if (smooth) R.string.settings_on else R.string.settings_off),
+                        onClick = { viewModel.toggleTunneling() },
+                        primary = smooth,
+                    )
                     ActionButton(
                         text = stringResource(R.string.settings_clear_history),
                         onClick = {
@@ -298,62 +297,20 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
                 }
 
+                Spacer(Modifier.height(8.dp))
+
+                Text(stringResource(R.string.settings_smooth_hint), color = Muted, fontSize = 13.sp)
+
                 val note = message
 
                 if (note != null) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
                     Text(note, color = AccentBright, fontSize = 15.sp)
                 }
             }
         }
 
-        item {
-            Group(stringResource(R.string.settings_diagnostics), focusable = true) {
-                val report = crash
-
-                if (report == null) {
-                    Text(stringResource(R.string.settings_crash_none), color = Muted, fontSize = 15.sp)
-                } else {
-                    Text(stringResource(R.string.settings_crash_title), color = Danger, fontSize = 15.sp)
-
-                    Spacer(Modifier.height(6.dp))
-
-                    Text(
-                        report.lines().take(8).joinToString("\n"),
-                        color = Muted,
-                        fontSize = 12.sp,
-                        maxLines = 8,
-                    )
-
-                    Spacer(Modifier.height(10.dp))
-
-                    ActionButton(
-                        text = stringResource(R.string.settings_crash_clear),
-                        onClick = {
-                            CrashLog.clear(context)
-                            crash = null
-                        },
-                    )
-                }
-            }
-        }
-
-        item {
-            Group(stringResource(R.string.settings_about), focusable = true) {
-                Text(
-                    "LAMAYNE IPTV  " + stringResource(R.string.settings_version, version),
-                    color = TextMain,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                Text(stringResource(R.string.settings_disclaimer), color = Muted, fontSize = 15.sp)
-
-            }
-        }
-
+        // 5. Support and about: the QR code, its sentence, and the version
         item {
             Group(stringResource(R.string.settings_support), focusable = true) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -371,12 +328,26 @@ fun SettingsTab(viewModel: MainViewModel) {
                         Spacer(Modifier.width(24.dp))
                     }
 
-                    Text(
-                        stringResource(R.string.settings_support_text),
-                        color = TextMain,
-                        fontSize = 17.sp,
-                        modifier = Modifier.weight(1f),
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.settings_support_text),
+                            color = TextMain,
+                            fontSize = 17.sp,
+                        )
+
+                        Spacer(Modifier.height(14.dp))
+
+                        Text(
+                            "LAMAYNE IPTV  " + stringResource(R.string.settings_version, version),
+                            color = AccentBright,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+
+                        Spacer(Modifier.height(4.dp))
+
+                        Text(stringResource(R.string.settings_disclaimer), color = Muted, fontSize = 13.sp)
+                    }
                 }
             }
         }

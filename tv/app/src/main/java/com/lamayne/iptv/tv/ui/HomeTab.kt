@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -31,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
@@ -69,10 +71,11 @@ import com.lamayne.iptv.tv.data.MediaKind
 import com.lamayne.iptv.tv.data.UiError
 import com.lamayne.iptv.tv.data.WatchProgress
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-// The home page. The picture of the movie or series put forward is the DECOR of the whole
-// page: it melts into the background on the left, at the top and at the bottom (no frame,
-// no edge), the title and the Play button sit on the left, and the rows scroll over it.
+// The home page: one list. The banner (picture + texts) is its first element. When the cursor
+// goes down into the rows, the banner scrolls away upward and the rows take the whole
+// screen; when the cursor comes back up, the banner comes back, complete (never half hidden).
 @Composable
 fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
     val featured by viewModel.featured.collectAsStateWithLifecycle()
@@ -93,6 +96,10 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
     var index by remember { mutableStateOf(0) }
     var heroFocused by remember { mutableStateOf(false) }
     var focusedOnce by remember { mutableStateOf(false) }
+    var focusedRow by remember { mutableStateOf(-1) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
     // A title that is already in "Continue watching" is not put forward again: seeing the
     // same film twice (big picture and a resume card) was confusing.
     val startedMovies = remember(continueItems) {
@@ -132,61 +139,93 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // The top of the page never scrolls: picture and texts stay where they are, so the
-        // title cannot go under the menu, and the rows never slide over the picture.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(260.dp),
-        ) {
-            HomeBackdrop(
-                slide?.backdrop,
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .fillMaxWidth(0.7f)
-                    .fillMaxHeight(),
-            )
+    // Cursor in the rows -> the banner goes up and away. Cursor on the banner -> it is back.
+    val rowsFocused = focusedRow >= 1
 
-            // Behind the texts: the title stays readable whatever the picture.
+    LaunchedEffect(rowsFocused) {
+        if (rowsFocused) listState.animateScrollToItem(1)
+    }
+
+    LaunchedEffect(heroFocused) {
+        if (heroFocused) listState.animateScrollToItem(0)
+    }
+
+    val onRowFocus: (Int, Boolean) -> Unit = { order, has ->
+        if (has) focusedRow = order else if (focusedRow == order) focusedRow = -1
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                // Up from the first row: the banner (scrolled away, so not reachable by itself)
+                // comes back and takes the cursor.
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp && focusedRow == 1) {
+                    scope.launch {
+                        listState.animateScrollToItem(0)
+                        delay(150)
+                        runCatching { entryFocus.requestFocus() }
+                    }
+                    true
+                } else {
+                    false
+                }
+            },
+        contentPadding = PaddingValues(bottom = 48.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.6f)
-                    .fillMaxHeight()
-                    .background(Brush.horizontalGradient(listOf(Color(0xD90A0A12), Color.Transparent))),
-            )
+                    .fillMaxWidth()
+                    .height(260.dp),
+            ) {
+                HomeBackdrop(
+                    slide?.backdrop,
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .fillMaxWidth(0.7f)
+                        .fillMaxHeight(),
+                )
 
-            HeroBlock(
-                slide = slide,
-                count = count,
-                index = index,
-                loading = loading,
-                error = error,
-                requester = entryFocus,
-                onRetry = { viewModel.retry(Tab.HOME) },
-                // "Play" opens the page of the movie or series: Play, Resume and the
-                // rest are there.
-                onOpen = { chosen ->
-                    val movie = chosen.movie
+                // Behind the texts: the title stays readable whatever the picture.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.6f)
+                        .fillMaxHeight()
+                        .background(Brush.horizontalGradient(listOf(Color(0xD90A0A12), Color.Transparent))),
+                )
 
-                    if (movie != null) viewModel.openMovie(movie)
-                    else chosen.series?.let { viewModel.openSeries(it) }
-                },
-                onStep = { delta -> if (count > 1) index = (index + delta + count) % count },
-                onFocusChange = { heroFocused = it },
-            )
+                HeroBlock(
+                    slide = slide,
+                    count = count,
+                    index = index,
+                    loading = loading,
+                    error = error,
+                    requester = entryFocus,
+                    onRetry = { viewModel.retry(Tab.HOME) },
+                    // "Play" opens the page of the movie or series: Play, Resume and the
+                    // rest are there.
+                    onOpen = { chosen ->
+                        val movie = chosen.movie
+
+                        if (movie != null) viewModel.openMovie(movie)
+                        else chosen.series?.let { viewModel.openSeries(it) }
+                    },
+                    onStep = { delta -> if (count > 1) index = (index + delta + count) % count },
+                    onFocusChange = { heroFocused = it },
+                )
+            }
         }
 
-        // Only the rows scroll, inside what is left of the screen.
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentPadding = PaddingValues(top = 2.dp, bottom = 40.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (continueItems.isNotEmpty()) {
-                item {
+        var order = 0
+
+        if (continueItems.isNotEmpty()) {
+            val mine = ++order
+
+            item {
+                Box(modifier = Modifier.onFocusChanged { onRowFocus(mine, it.hasFocus) }) {
                     ContentRow(stringResource(R.string.home_continue), continueItems) { item ->
                         WideCard(
                             title = displayName(item.seriesName ?: item.title),
@@ -197,21 +236,25 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                             },
                             image = item.image,
                             progress = item.fraction,
-                            modifier = Modifier.width(200.dp),
+                            modifier = Modifier.width(120.dp),
                             onClick = { pendingResume = item },
                         )
                     }
                 }
             }
+        }
 
-            if (favChannels.isNotEmpty()) {
-                item {
+        if (favChannels.isNotEmpty()) {
+            val mine = ++order
+
+            item {
+                Box(modifier = Modifier.onFocusChanged { onRowFocus(mine, it.hasFocus) }) {
                     ContentRow(stringResource(R.string.home_my_channels), favChannels) { channel ->
                         val now = epgMap[channel.id]?.now
 
                         ChannelTile(
                             channel = channel,
-                            modifier = Modifier.width(120.dp),
+                            modifier = Modifier.width(100.dp),
                             nowTitle = now?.title,
                             nowProgress = now?.progress(System.currentTimeMillis() / 1000),
                             onLongClick = { viewModel.toggleFavorite(channel) },
@@ -220,9 +263,13 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                     }
                 }
             }
+        }
 
-            if (favMovies.isNotEmpty()) {
-                item {
+        if (favMovies.isNotEmpty()) {
+            val mine = ++order
+
+            item {
+                Box(modifier = Modifier.onFocusChanged { onRowFocus(mine, it.hasFocus) }) {
                     ContentRow(stringResource(R.string.home_my_movies), favMovies) { movie ->
                         PosterCard(
                             title = displayName(movie.name),
@@ -235,9 +282,13 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                     }
                 }
             }
+        }
 
-            if (favSeries.isNotEmpty()) {
-                item {
+        if (favSeries.isNotEmpty()) {
+            val mine = ++order
+
+            item {
+                Box(modifier = Modifier.onFocusChanged { onRowFocus(mine, it.hasFocus) }) {
                     ContentRow(stringResource(R.string.home_my_series), favSeries) { series ->
                         PosterCard(
                             title = displayName(series.name),
@@ -250,9 +301,13 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                     }
                 }
             }
+        }
 
-            if (latestMovies.isNotEmpty()) {
-                item {
+        if (latestMovies.isNotEmpty()) {
+            val mine = ++order
+
+            item {
+                Box(modifier = Modifier.onFocusChanged { onRowFocus(mine, it.hasFocus) }) {
                     ContentRow(stringResource(R.string.home_latest_movies), latestMovies) { movie ->
                         PosterCard(
                             title = displayName(movie.name),
@@ -265,9 +320,13 @@ fun HomeTab(viewModel: MainViewModel, entryFocus: FocusRequester) {
                     }
                 }
             }
+        }
 
-            if (latestSeries.isNotEmpty()) {
-                item {
+        if (latestSeries.isNotEmpty()) {
+            val mine = ++order
+
+            item {
+                Box(modifier = Modifier.onFocusChanged { onRowFocus(mine, it.hasFocus) }) {
                     ContentRow(stringResource(R.string.home_latest_series), latestSeries) { series ->
                         PosterCard(
                             title = displayName(series.name),

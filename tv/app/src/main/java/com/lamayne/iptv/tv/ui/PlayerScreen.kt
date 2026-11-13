@@ -56,6 +56,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.ui.PlayerView
 import com.lamayne.iptv.tv.R
+import com.lamayne.iptv.tv.data.Secrets
 import com.lamayne.iptv.tv.data.Channel
 import com.lamayne.iptv.tv.data.EpgEntry
 import com.lamayne.iptv.tv.data.EpgInfo
@@ -113,7 +114,7 @@ fun LivePlayerScreen(
     DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                retryOrFail("${error.errorCodeName}: ${error.message ?: ""}")
+                retryOrFail(Secrets.redact("${error.errorCodeName}: ${error.message ?: ""}").orEmpty())
             }
 
             override fun onTracksChanged(tracks: Tracks) {

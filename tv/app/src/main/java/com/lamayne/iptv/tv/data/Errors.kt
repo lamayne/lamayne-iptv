@@ -10,5 +10,5 @@ fun toUiError(e: Exception): UiError =
         is UnknownHostException -> UiError.ServerNotFound
         is SocketTimeoutException -> UiError.Timeout
         is XtreamClient.HttpException -> UiError.Http(e.code)
-        else -> UiError.Other(e.message)
+        else -> UiError.Other(Secrets.redact(e.message))
     }

@@ -5,29 +5,64 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
-// Test build: the account is kept in the app's private storage (not encrypted yet).
+// The account (address, user, password) is kept encrypted (see Vault). An account saved in clear
+// by an older version is encrypted at the first start and the clear copy is erased.
 class CredentialStore(context: Context) {
     private val prefs = context.getSharedPreferences("lamayne_tv", Context.MODE_PRIVATE)
 
     fun load(): Credentials? {
-        val server = prefs.getString("server", null) ?: return null
-        val user = prefs.getString("user", null) ?: return null
-        val pass = prefs.getString("pass", null) ?: return null
+        prefs.getString("account", null)?.let { sealed ->
+            val json = Vault.open(sealed)
 
-        return Credentials(server, user, pass)
+            if (json == null) {
+                // the key is gone (or the data damaged): signed out, nothing readable remains
+                prefs.edit().remove("account").apply()
+                return null
+            }
+
+            return try {
+                val o = JSONObject(json)
+
+                Credentials(o.getString("server"), o.getString("user"), o.getString("pass"))
+            } catch (e: JSONException) {
+                null
+            }
+        }
+
+        // from an older version: encrypt, then erase the clear copy
+        val server = prefs.getString("server", null)
+        val user = prefs.getString("user", null)
+        val pass = prefs.getString("pass", null)
+
+        if (server == null || user == null || pass == null) return null
+
+        val legacy = Credentials(server, user, pass)
+
+        save(legacy)
+
+        return legacy
     }
 
     fun save(credentials: Credentials) {
+        val json = JSONObject()
+            .put("server", credentials.server)
+            .put("user", credentials.user)
+            .put("pass", credentials.pass)
+            .toString()
+        val sealed = Vault.seal(json)
+
+        // a clear copy is never written: without encryption the account is simply not kept
         prefs.edit()
-            .putString("server", credentials.server)
-            .putString("user", credentials.user)
-            .putString("pass", credentials.pass)
+            .remove("server").remove("user").remove("pass")
+            .apply {
+                if (sealed != null) putString("account", sealed) else remove("account")
+            }
             .apply()
     }
 
     // Signing out forgets the account but keeps favourites, history and settings.
     fun clear() {
-        prefs.edit().remove("server").remove("user").remove("pass").apply()
+        prefs.edit().remove("account").remove("server").remove("user").remove("pass").apply()
     }
 }
 
@@ -45,7 +80,9 @@ class JsonListStore<T>(
         "$prefix${(account.server + "|" + account.user).hashCode()}"
 
     fun load(account: Credentials): List<T> {
-        val raw = prefs.getString(key(account), null) ?: return emptyList()
+        val stored = prefs.getString(key(account), null) ?: return emptyList()
+        val legacy = !Vault.isSealed(stored)
+        val raw = if (legacy) stored else Vault.open(stored) ?: return emptyList()
 
         return try {
             val array = JSONArray(raw)
@@ -58,6 +95,9 @@ class JsonListStore<T>(
                 items.add(value)
             }
 
+            // a list saved in clear by an older version is encrypted now
+            if (legacy) save(account, items)
+
             items
         } catch (e: JSONException) {
             emptyList()
@@ -69,7 +109,10 @@ class JsonListStore<T>(
 
         for (item in items.take(limit)) array.put(toJson(item))
 
-        prefs.edit().putString(key(account), array.toString()).apply()
+        // encrypted: these lists can hold stream addresses (some contain a password)
+        val sealed = Vault.seal(array.toString()) ?: return
+
+        prefs.edit().putString(key(account), sealed).apply()
     }
 }
 
