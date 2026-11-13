@@ -13,8 +13,8 @@ android {
         // Android 6.0: the oldest version with the encrypted key storage (Keystore AES-GCM).
         minSdk = 23
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.10.1"
+        versionCode = 15
+        versionName = "0.11.0"
     }
 
     buildTypes {

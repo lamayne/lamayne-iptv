@@ -153,6 +153,8 @@
     <string name="settings_sign_out">Se déconnecter</string>
     <string name="settings_smooth">Mode 4K fluide</string>
     <string name="settings_smooth_hint">Si le son est décalé, désactivez le mode 4K fluide.</string>
+    <string name="settings_startup">Démarrage</string>
+    <string name="settings_startup_open">Ouvrir au démarrage de la TV</string>
     <string name="settings_support">À propos</string>
     <string name="settings_support_text">Scannez le code avec votre téléphone : actualités, mises à jour et moyen de soutenir le projet.</string>
     <string name="settings_version">version %1$s</string>
@@ -163,4 +165,8 @@
     <string name="similar_none">Aucun titre similaire trouvé.</string>
     <string name="similar_series">Séries similaires</string>
     <string name="splash_loading">Chargement…</string>
+    <string name="startup_hint">Fonctionne à l’allumage de la TV (pas depuis la veille) et seulement si la TV l’autorise.</string>
+    <string name="startup_need">Autorisation nécessaire : autorisez « Affichage par-dessus les autres applis » pour LAMAYNE IPTV dans l’écran qui s’est ouvert.</string>
+    <string name="startup_ready">Prêt : l’application s’ouvre au démarrage de la TV.</string>
+    <string name="startup_unavailable">Indisponible sur cette TV : le système ne propose pas cette autorisation.</string>
 </resources>

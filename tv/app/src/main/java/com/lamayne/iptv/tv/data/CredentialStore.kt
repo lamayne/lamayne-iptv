@@ -126,6 +126,13 @@ class SettingsStore(context: Context) {
             prefs.edit().putString("lang", value).apply()
         }
 
+    // Open the app when the TV starts (needs the "display over other apps" permission).
+    var launchAtBoot: Boolean
+        get() = prefs.getBoolean("launch_at_boot", false)
+        set(value) {
+            prefs.edit().putBoolean("launch_at_boot", value).apply()
+        }
+
     // The language of what the home page recommends: "auto" = the language of the app.
     var homeLanguage: String
         get() = prefs.getString("home_lang", "auto") ?: "auto"

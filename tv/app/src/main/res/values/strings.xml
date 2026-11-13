@@ -153,6 +153,8 @@
     <string name="settings_sign_out">Sign out</string>
     <string name="settings_smooth">4K smooth mode</string>
     <string name="settings_smooth_hint">If the sound is out of sync, turn the 4K smooth mode off.</string>
+    <string name="settings_startup">Startup</string>
+    <string name="settings_startup_open">Open at TV startup</string>
     <string name="settings_support">About</string>
     <string name="settings_support_text">Scan the code with your phone: news, updates and a way to support the project.</string>
     <string name="settings_version">version %1$s</string>
@@ -163,4 +165,8 @@
     <string name="similar_none">No similar title found.</string>
     <string name="similar_series">Similar series</string>
     <string name="splash_loading">Loading…</string>
+    <string name="startup_hint">Works when the TV powers on (not from standby) and only if the TV allows it.</string>
+    <string name="startup_need">Permission needed: allow “Display over other apps” for LAMAYNE IPTV in the screen that opened.</string>
+    <string name="startup_ready">Ready: the app opens when the TV starts.</string>
+    <string name="startup_unavailable">Not available on this TV: the system does not offer this permission.</string>
 </resources>

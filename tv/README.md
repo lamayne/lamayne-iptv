@@ -1,7 +1,7 @@
 # LAMAYNE IPTV for Google TV / Android TV (test build)
 
 A native Android TV app (Kotlin, Jetpack Compose, Media3/ExoPlayer). It works
-on Android 6.0 and later. Test build 0.10.1: sign in with an Xtream account,
+on Android 6.0 and later. Test build 0.11: sign in with an Xtream account,
 browse live categories and channels, favourites, recent channels, search, the programme guide (now / next), and play with on-screen controls (pause, previous / next channel, favourite; up / down to zap).
 
 - Built by GitHub Actions: **Actions -> Android TV build (test) -> Run workflow**.

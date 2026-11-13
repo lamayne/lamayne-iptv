@@ -153,6 +153,8 @@
     <string name="settings_sign_out">Cerrar sesión</string>
     <string name="settings_smooth">Modo 4K fluido</string>
     <string name="settings_smooth_hint">Si el sonido se desfasa, desactiva el modo 4K fluido.</string>
+    <string name="settings_startup">Inicio</string>
+    <string name="settings_startup_open">Abrir al iniciar la TV</string>
     <string name="settings_support">Acerca de</string>
     <string name="settings_support_text">Escanea el código con tu móvil: novedades, actualizaciones y una forma de apoyar el proyecto.</string>
     <string name="settings_version">versión %1$s</string>
@@ -163,4 +165,8 @@
     <string name="similar_none">No se encontró ningún título similar.</string>
     <string name="similar_series">Series similares</string>
     <string name="splash_loading">Cargando…</string>
+    <string name="startup_hint">Funciona al encender la TV (no desde el reposo) y solo si la TV lo permite.</string>
+    <string name="startup_need">Permiso necesario: permite «Mostrar sobre otras apps» para LAMAYNE IPTV en la pantalla que se abrió.</string>
+    <string name="startup_ready">Listo: la aplicación se abre al iniciar la TV.</string>
+    <string name="startup_unavailable">No disponible en esta TV: el sistema no ofrece este permiso.</string>
 </resources>

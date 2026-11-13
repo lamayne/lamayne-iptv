@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -46,6 +48,7 @@ import com.lamayne.iptv.tv.R
 import com.lamayne.iptv.tv.data.AccountInfo
 import com.lamayne.iptv.tv.data.MediaKind
 import java.net.URI
+import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 
@@ -115,8 +118,19 @@ fun SettingsTab(viewModel: MainViewModel) {
     val cleared = stringResource(R.string.settings_cleared)
     val subscription by viewModel.accountInfo.collectAsStateWithLifecycle()
     val smooth by viewModel.tunneling.collectAsStateWithLifecycle()
+    var bootEnabled by remember { mutableStateOf(viewModel.settings.launchAtBoot) }
+    var overlayGranted by remember { mutableStateOf(canOverlay(context)) }
+    var overlayUnavailable by remember { mutableStateOf(false) }
     val homeLanguage by viewModel.homeLanguage.collectAsStateWithLifecycle()
     val availableLanguages by viewModel.availableHomeLanguages.collectAsStateWithLifecycle()
+
+    // The permission is granted in a system screen: it is looked at again while Settings is open.
+    LaunchedEffect(Unit) {
+        while (true) {
+            overlayGranted = canOverlay(context)
+            delay(1_000)
+        }
+    }
 
     // The subscription (days left) is asked each time Settings opens.
     LaunchedEffect(Unit) {
@@ -144,29 +158,24 @@ fun SettingsTab(viewModel: MainViewModel) {
         // 1. Language (the movies and series on the home page follow it)
         item {
             Group(stringResource(R.string.settings_language)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val options = listOf(
+                SelectField(
+                    title = stringResource(R.string.settings_language),
+                    options = listOf(
                         "system" to stringResource(R.string.settings_language_auto),
                         "en" to "English",
                         "fr" to "Fran\u00e7ais",
                         "es" to "Espa\u00f1ol",
-                    )
-
-                    for ((code, label) in options) {
-                        Pill(
-                            text = label,
-                            selected = language == code,
-                            onClick = {
-                                if (language != code) {
-                                    language = code
-                                    viewModel.setLanguage(code)
-                                    // The screens are rebuilt in the new language.
-                                    context.findActivity()?.recreate()
-                                }
-                            },
-                        )
-                    }
-                }
+                    ),
+                    selectedKey = language,
+                    onSelect = { code ->
+                        if (language != code) {
+                            language = code
+                            viewModel.setLanguage(code)
+                            // The screens are rebuilt in the new language.
+                            context.findActivity()?.recreate()
+                        }
+                    },
+                )
 
                 Spacer(Modifier.height(10.dp))
 
@@ -183,24 +192,18 @@ fun SettingsTab(viewModel: MainViewModel) {
 
                 Spacer(Modifier.height(14.dp))
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Pill(
-                        text = stringResource(R.string.settings_language_auto),
-                        selected = homeLanguage == "auto",
-                        onClick = { viewModel.setHomeLanguage("auto") },
-                    )
-
-                    // the chosen one stays in the list even if its categories were hidden since
-                    // French, English and Spanish are always offered (the synopsis decides), then the
-                    // other languages found in the categories, and the chosen one
-                    for (code in (listOf("fr", "en", "es") + availableLanguages + homeLanguage).filter { it != "auto" }.distinct()) {
-                        Pill(
-                            text = languageLabel(code),
-                            selected = homeLanguage == code,
-                            onClick = { viewModel.setHomeLanguage(code) },
-                        )
-                    }
-                }
+                // French, English and Spanish are always offered (the synopsis decides), then the other
+                // languages found in the categories, and the chosen one
+                SelectField(
+                    title = stringResource(R.string.settings_reco),
+                    options = listOf("auto" to stringResource(R.string.settings_language_auto)) +
+                        (listOf("fr", "en", "es") + availableLanguages + homeLanguage)
+                            .filter { it != "auto" }
+                            .distinct()
+                            .map { it to languageLabel(it) },
+                    selectedKey = homeLanguage,
+                    onSelect = { code -> viewModel.setHomeLanguage(code) },
+                )
             }
         }
 
@@ -374,7 +377,58 @@ fun SettingsTab(viewModel: MainViewModel) {
             }
         }
 
-        // 6. About: the QR code, its sentence and the version
+        // 6. Startup: open the app when the TV starts
+        item {
+            Group(stringResource(R.string.settings_startup)) {
+                ActionButton(
+                    text = stringResource(R.string.settings_startup_open) + ": " +
+                        stringResource(if (bootEnabled) R.string.settings_on else R.string.settings_off),
+                    primary = bootEnabled,
+                    onClick = {
+                        if (bootEnabled) {
+                            bootEnabled = false
+                            viewModel.settings.launchAtBoot = false
+                        } else {
+                            bootEnabled = true
+                            viewModel.settings.launchAtBoot = true
+
+                            // The system screen where the permission is given (not on every TV).
+                            if (!overlayGranted) {
+                                try {
+                                    context.startActivity(overlayScreen(context))
+                                } catch (e: Exception) {
+                                    bootEnabled = false
+                                    viewModel.settings.launchAtBoot = false
+                                    overlayUnavailable = true
+                                }
+                            }
+                        }
+                    },
+                )
+
+                val status = when {
+                    bootEnabled && overlayGranted -> stringResource(R.string.startup_ready)
+                    overlayUnavailable && !overlayGranted -> stringResource(R.string.startup_unavailable)
+                    bootEnabled -> stringResource(R.string.startup_need)
+                    else -> null
+                }
+
+                if (status != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        status,
+                        color = if (bootEnabled && overlayGranted) AccentBright else Color(0xFFFBBF24),
+                        fontSize = 15.sp,
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Text(stringResource(R.string.startup_hint), color = Muted, fontSize = 13.sp)
+            }
+        }
+
+        // 7. About: the QR code, its sentence and the version
         item {
             Group(stringResource(R.string.settings_support), focusable = true) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -475,3 +529,11 @@ private fun SubscriptionLines(info: AccountInfo) {
         Text(stringResource(R.string.account_trial), color = Muted, fontSize = 14.sp)
     }
 }
+
+// "Display over other apps": needed since Android 10 for an app to open itself in the background.
+private fun canOverlay(context: Context): Boolean =
+    Build.VERSION.SDK_INT < 29 || Settings.canDrawOverlays(context)
+
+private fun overlayScreen(context: Context): Intent =
+    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + context.packageName))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
