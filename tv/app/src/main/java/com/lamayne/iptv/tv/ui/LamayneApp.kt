@@ -125,9 +125,9 @@ fun LamayneApp(viewModel: MainViewModel) {
                 }
             }
 
-            route is Route.MovieDetails -> MovieDetailsScreen(viewModel, route.movie)
+            route is Route.MovieDetails -> key(route) { MovieDetailsScreen(viewModel, route.movie) }
 
-            route is Route.SeriesDetails -> SeriesDetailsScreen(viewModel, route.series)
+            route is Route.SeriesDetails -> key(route) { SeriesDetailsScreen(viewModel, route.series) }
 
             route is Route.ManageCategories -> ManageCategoriesScreen(viewModel, route.kind)
 

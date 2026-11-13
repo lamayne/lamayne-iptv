@@ -4,7 +4,6 @@
     <string name="account_connections">Conexiones en uso: %1$d de %2$d</string>
     <string name="account_days_left">Suscripción: quedan %1$d día(s) (hasta el %2$s)</string>
     <string name="account_expired">Suscripción caducada el %1$s</string>
-    <string name="account_not_encrypted">Sin cifrar: el servidor de tu proveedor usa http, no https.</string>
     <string name="account_trial">Cuenta de prueba</string>
     <string name="account_unlimited">Suscripción: sin fecha de caducidad</string>
     <string name="actor_elapsed">%1$d s</string>
@@ -112,6 +111,10 @@
     <string name="player_subtitles">Subtítulos</string>
     <string name="player_try_other">Pulsa Arriba o Abajo para probar otro canal, Atrás para volver.</string>
     <string name="player_unsupported">no compatible con esta TV</string>
+    <string name="reason_cast">Mismo reparto</string>
+    <string name="reason_category">Misma categoría</string>
+    <string name="reason_director">Mismo director</string>
+    <string name="reason_genre">Mismo género</string>
     <string name="recent_empty_hint">Lo que veas aparecerá aquí.</string>
     <string name="recent_empty_title">Aún no has visto nada</string>
     <string name="resume_title">¿Continuar la reproducción?</string>
@@ -128,13 +131,15 @@
     <string name="settings_account_as">Sesión iniciada como %1$s en %2$s</string>
     <string name="settings_clear_history">Borrar historial de reproducción</string>
     <string name="settings_cleared">Hecho.</string>
-    <string name="settings_content">Contenido y reproducción</string>
     <string name="settings_disclaimer">LAMAYNE IPTV es un reproductor: no proporciona contenido. Usa solo fuentes que estés autorizado a usar.</string>
     <string name="settings_language">Idioma</string>
     <string name="settings_language_auto">Automático</string>
     <string name="settings_language_hint">Las películas y series sugeridas en el inicio siguen este idioma.</string>
     <string name="settings_off">Desactivado</string>
     <string name="settings_on">Activado</string>
+    <string name="settings_playback_history">Reproducción e historial</string>
+    <string name="settings_reco">Recomendaciones del inicio</string>
+    <string name="settings_reco_hint">Idioma de las películas y series destacadas en el inicio. Solo se muestran los idiomas presentes en tus categorías visibles.</string>
     <string name="settings_refresh">Actualizar</string>
     <string name="settings_refresh_all">Actualizar todo</string>
     <string name="settings_refresh_guide">Guía</string>
@@ -146,9 +151,14 @@
     <string name="settings_sign_out">Cerrar sesión</string>
     <string name="settings_smooth">Modo 4K fluido</string>
     <string name="settings_smooth_hint">Si el sonido se desfasa, desactiva el modo 4K fluido.</string>
-    <string name="settings_support">Apoyo y acerca de</string>
+    <string name="settings_support">Acerca de</string>
     <string name="settings_support_text">Escanea el código con tu móvil: novedades, actualizaciones y una forma de apoyar el proyecto.</string>
     <string name="settings_version">versión %1$s</string>
+    <string name="settings_visible">Contenido visible</string>
     <string name="settings_visible_hint">Los proveedores envían cientos de categorías. Elige las que quieres ver.</string>
+    <string name="similar_loading">Buscando títulos similares…</string>
+    <string name="similar_movies">Películas similares</string>
+    <string name="similar_none">No se encontró ningún título similar.</string>
+    <string name="similar_series">Series similares</string>
     <string name="splash_loading">Cargando…</string>
 </resources>

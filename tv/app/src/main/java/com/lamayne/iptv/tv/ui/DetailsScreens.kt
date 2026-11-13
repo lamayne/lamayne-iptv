@@ -142,9 +142,11 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
     Box(modifier = Modifier.fillMaxSize()) {
         Backdrop(info?.backdrop ?: movie.poster, movie.name)
 
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            item {
         Row(
             modifier = Modifier
-                .fillMaxSize()
+                .fillParentMaxHeight(0.86f)
                 .padding(horizontal = 56.dp, vertical = 36.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -277,6 +279,10 @@ fun MovieDetailsScreen(viewModel: MainViewModel, movie: Movie) {
                 }
             }
         }
+            }
+
+            item { SimilarMoviesSection(viewModel) }
+        }
     }
 }
 
@@ -314,9 +320,11 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
     Box(modifier = Modifier.fillMaxSize()) {
         Backdrop(info?.backdrop ?: series.poster, series.name)
 
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            item {
         Row(
             modifier = Modifier
-                .fillMaxSize()
+                .fillParentMaxHeight(0.86f)
                 .padding(horizontal = 56.dp, vertical = 32.dp),
         ) {
             Column(modifier = Modifier.width(290.dp)) {
@@ -430,6 +438,10 @@ fun SeriesDetailsScreen(viewModel: MainViewModel, series: Series) {
                     }
                 }
             }
+        }
+            }
+
+            item { SimilarSeriesSection(viewModel) }
         }
     }
 

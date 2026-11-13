@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -48,6 +50,7 @@ fun LoginScreen(viewModel: MainViewModel) {
     var pass by rememberSaveable { mutableStateOf("") }
     var mode by rememberSaveable { mutableStateOf(0) }
     var m3u by rememberSaveable { mutableStateOf("") }
+    var showPass by rememberSaveable { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -123,8 +126,13 @@ fun LoginScreen(viewModel: MainViewModel) {
                     onValueChange = { pass = it },
                     label = { Text(stringResource(R.string.login_pass)) },
                     singleLine = true,
-                    // dots instead of letters: the password is not shown on the TV
-                    visualTransformation = PasswordVisualTransformation(),
+                    // dots instead of letters, unless the eye is pressed
+                    visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showPass = !showPass }) {
+                            EyeGlyph(open = showPass)
+                        }
+                    },
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done,

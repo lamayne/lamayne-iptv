@@ -4,7 +4,6 @@
     <string name="account_connections">Connections in use: %1$d of %2$d</string>
     <string name="account_days_left">Subscription: %1$d day(s) left (until %2$s)</string>
     <string name="account_expired">Subscription expired on %1$s</string>
-    <string name="account_not_encrypted">Not encrypted: your provider’s server uses http, not https.</string>
     <string name="account_trial">Trial account</string>
     <string name="account_unlimited">Subscription: no expiry date</string>
     <string name="actor_elapsed">%1$d s</string>
@@ -112,6 +111,10 @@
     <string name="player_subtitles">Subtitles</string>
     <string name="player_try_other">Press Up or Down to try another channel, Back to return.</string>
     <string name="player_unsupported">not supported by this TV</string>
+    <string name="reason_cast">Same cast</string>
+    <string name="reason_category">Same category</string>
+    <string name="reason_director">Same director</string>
+    <string name="reason_genre">Same genre</string>
     <string name="recent_empty_hint">What you watch will appear here.</string>
     <string name="recent_empty_title">Nothing watched yet</string>
     <string name="resume_title">Resume playback?</string>
@@ -128,13 +131,15 @@
     <string name="settings_account_as">Signed in as %1$s on %2$s</string>
     <string name="settings_clear_history">Clear watch history</string>
     <string name="settings_cleared">Done.</string>
-    <string name="settings_content">Content and playback</string>
     <string name="settings_disclaimer">LAMAYNE IPTV is a player: it provides no content. Use only sources you are authorised to use.</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_auto">Automatic</string>
     <string name="settings_language_hint">The movies and series suggested on the home page follow this language.</string>
     <string name="settings_off">Off</string>
     <string name="settings_on">On</string>
+    <string name="settings_playback_history">Playback and history</string>
+    <string name="settings_reco">Home recommendations</string>
+    <string name="settings_reco_hint">Language of the movies and series put forward on the home page. Only the languages found in your visible categories are listed.</string>
     <string name="settings_refresh">Update</string>
     <string name="settings_refresh_all">Update all</string>
     <string name="settings_refresh_guide">Guide</string>
@@ -146,9 +151,14 @@
     <string name="settings_sign_out">Sign out</string>
     <string name="settings_smooth">4K smooth mode</string>
     <string name="settings_smooth_hint">If the sound is out of sync, turn the 4K smooth mode off.</string>
-    <string name="settings_support">Support and about</string>
+    <string name="settings_support">About</string>
     <string name="settings_support_text">Scan the code with your phone: news, updates and a way to support the project.</string>
     <string name="settings_version">version %1$s</string>
+    <string name="settings_visible">Visible content</string>
     <string name="settings_visible_hint">Providers send hundreds of categories. Choose the ones you want to see.</string>
+    <string name="similar_loading">Looking for similar titles…</string>
+    <string name="similar_movies">Similar movies</string>
+    <string name="similar_none">No similar title found.</string>
+    <string name="similar_series">Similar series</string>
     <string name="splash_loading">Loading…</string>
 </resources>

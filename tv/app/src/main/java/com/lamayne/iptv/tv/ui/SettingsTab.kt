@@ -10,6 +10,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -78,15 +79,25 @@ private fun Group(title: String, focusable: Boolean = false, content: @Composabl
             .border(2.dp, if (focused) Accent else Color.Transparent, shape)
             .padding(22.dp),
     ) {
-        Text(
-            title.uppercase(),
-            color = Muted,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(width = 3.dp, height = 13.dp)
+                    .background(Accent, RoundedCornerShape(2.dp)),
+            )
 
-        Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.width(9.dp))
+
+            Text(
+                title.uppercase(),
+                color = Muted,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp,
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         content()
     }
@@ -104,9 +115,16 @@ fun SettingsTab(viewModel: MainViewModel) {
     val cleared = stringResource(R.string.settings_cleared)
     val subscription by viewModel.accountInfo.collectAsStateWithLifecycle()
     val smooth by viewModel.tunneling.collectAsStateWithLifecycle()
+    val homeLanguage by viewModel.homeLanguage.collectAsStateWithLifecycle()
+    val availableLanguages by viewModel.availableHomeLanguages.collectAsStateWithLifecycle()
 
     // The subscription (days left) is asked each time Settings opens.
-    LaunchedEffect(Unit) { viewModel.loadAccountInfo() }
+    LaunchedEffect(Unit) {
+        viewModel.loadAccountInfo()
+        // the languages offered for the recommendations come from the movie and series categories
+        viewModel.ensureCategories(MediaKind.MOVIE)
+        viewModel.ensureCategories(MediaKind.SERIES)
+    }
 
     val version = remember {
         try {
@@ -157,6 +175,33 @@ fun SettingsTab(viewModel: MainViewModel) {
         }
 
 
+
+        // 1b. Language of the home recommendations (only languages found in the visible categories)
+        item {
+            Group(stringResource(R.string.settings_reco)) {
+                Text(stringResource(R.string.settings_reco_hint), color = Muted, fontSize = 15.sp)
+
+                Spacer(Modifier.height(14.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Pill(
+                        text = stringResource(R.string.settings_language_auto),
+                        selected = homeLanguage == "auto",
+                        onClick = { viewModel.setHomeLanguage("auto") },
+                    )
+
+                    // the chosen one stays in the list even if its categories were hidden since
+                    for (code in (availableLanguages + homeLanguage).filter { it != "auto" }.distinct()) {
+                        Pill(
+                            text = languageLabel(code),
+                            selected = homeLanguage == code,
+                            onClick = { viewModel.setHomeLanguage(code) },
+                        )
+                    }
+                }
+            }
+        }
+
         // 2. Account: who is signed in and how many days are left
         item {
             Group(stringResource(R.string.settings_account)) {
@@ -182,12 +227,6 @@ fun SettingsTab(viewModel: MainViewModel) {
                     SubscriptionLines(plan)
                 }
 
-                // An address in http: the password travels in clear on the network.
-                if (credentials?.server?.startsWith("http://", ignoreCase = true) == true) {
-                    Spacer(Modifier.height(6.dp))
-                    Text(stringResource(R.string.account_not_encrypted), color = Color(0xFFFBBF24), fontSize = 13.sp)
-                }
-
                 Spacer(Modifier.height(14.dp))
 
                 ActionButton(
@@ -198,17 +237,19 @@ fun SettingsTab(viewModel: MainViewModel) {
         }
 
 
-        // 3. Update: "update everything" first
+        // 3. Update: "update everything" first, wider than the others
         item {
             Group(stringResource(R.string.settings_refresh)) {
                 Text(stringResource(R.string.settings_refresh_hint), color = Muted, fontSize = 15.sp)
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(16.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_all),
                         primary = true,
+                        fill = true,
+                        modifier = Modifier.weight(1.7f),
                         onClick = {
                             viewModel.refreshAll()
                             refreshMessage = refreshing
@@ -216,6 +257,8 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_live),
+                        fill = true,
+                        modifier = Modifier.weight(1f),
                         onClick = {
                             viewModel.refresh(MediaKind.LIVE)
                             refreshMessage = refreshing
@@ -223,6 +266,8 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_movies),
+                        fill = true,
+                        modifier = Modifier.weight(1f),
                         onClick = {
                             viewModel.refresh(MediaKind.MOVIE)
                             refreshMessage = refreshing
@@ -230,6 +275,8 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_series),
+                        fill = true,
+                        modifier = Modifier.weight(1f),
                         onClick = {
                             viewModel.refresh(MediaKind.SERIES)
                             refreshMessage = refreshing
@@ -237,6 +284,8 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
                     ActionButton(
                         text = stringResource(R.string.settings_refresh_guide),
+                        fill = true,
+                        modifier = Modifier.weight(1f),
                         onClick = {
                             viewModel.refreshGuide()
                             refreshMessage = refreshing
@@ -253,43 +302,56 @@ fun SettingsTab(viewModel: MainViewModel) {
             }
         }
 
-        // 4. Content and playback: visible categories; then 4K mode and clear history side by side
+        // 4. Visible content: which categories are shown
         item {
-            Group(stringResource(R.string.settings_content)) {
+            Group(stringResource(R.string.settings_visible)) {
                 Text(
                     stringResource(R.string.settings_visible_hint),
                     color = Muted,
                     fontSize = 15.sp,
                 )
 
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(16.dp))
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ActionButton(
                         text = stringResource(R.string.live_categories),
+                        fill = true,
+                        modifier = Modifier.weight(1f),
                         onClick = { viewModel.openManageCategories(MediaKind.LIVE) },
                     )
                     ActionButton(
                         text = stringResource(R.string.movies_categories),
+                        fill = true,
+                        modifier = Modifier.weight(1f),
                         onClick = { viewModel.openManageCategories(MediaKind.MOVIE) },
                     )
                     ActionButton(
                         text = stringResource(R.string.series_categories),
+                        fill = true,
+                        modifier = Modifier.weight(1f),
                         onClick = { viewModel.openManageCategories(MediaKind.SERIES) },
                     )
                 }
+            }
+        }
 
-                Spacer(Modifier.height(12.dp))
-
+        // 5. Playback and history
+        item {
+            Group(stringResource(R.string.settings_playback_history)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ActionButton(
                         text = stringResource(R.string.settings_smooth) + ": " +
                             stringResource(if (smooth) R.string.settings_on else R.string.settings_off),
-                        onClick = { viewModel.toggleTunneling() },
                         primary = smooth,
+                        fill = true,
+                        modifier = Modifier.weight(1f),
+                        onClick = { viewModel.toggleTunneling() },
                     )
                     ActionButton(
                         text = stringResource(R.string.settings_clear_history),
+                        fill = true,
+                        modifier = Modifier.weight(1f),
                         onClick = {
                             viewModel.clearProgress()
                             message = cleared
@@ -297,7 +359,7 @@ fun SettingsTab(viewModel: MainViewModel) {
                     )
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
 
                 Text(stringResource(R.string.settings_smooth_hint), color = Muted, fontSize = 13.sp)
 
@@ -310,7 +372,7 @@ fun SettingsTab(viewModel: MainViewModel) {
             }
         }
 
-        // 5. Support and about: the QR code, its sentence, and the version
+        // 6. About: the QR code, its sentence and the version
         item {
             Group(stringResource(R.string.settings_support), focusable = true) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -325,7 +387,7 @@ fun SettingsTab(viewModel: MainViewModel) {
                                 .padding(8.dp),
                         )
 
-                        Spacer(Modifier.width(24.dp))
+                        Spacer(Modifier.width(28.dp))
                     }
 
                     Column(modifier = Modifier.weight(1f)) {
@@ -335,7 +397,7 @@ fun SettingsTab(viewModel: MainViewModel) {
                             fontSize = 17.sp,
                         )
 
-                        Spacer(Modifier.height(14.dp))
+                        Spacer(Modifier.height(16.dp))
 
                         Text(
                             "LAMAYNE IPTV  " + stringResource(R.string.settings_version, version),
@@ -353,6 +415,22 @@ fun SettingsTab(viewModel: MainViewModel) {
         }
     }
 }
+
+private fun languageLabel(code: String): String =
+    when (code) {
+        "fr" -> "Fran\u00e7ais"
+        "en" -> "English"
+        "es" -> "Espa\u00f1ol"
+        "de" -> "Deutsch"
+        "it" -> "Italiano"
+        "pt" -> "Portugu\u00eas"
+        "ar" -> "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"
+        "nl" -> "Nederlands"
+        "tr" -> "T\u00fcrk\u00e7e"
+        "pl" -> "Polski"
+        "ru" -> "\u0420\u0443\u0441\u0441\u043a\u0438\u0439"
+        else -> code.uppercase()
+    }
 
 // The QR code leads to the Linktree (news, updates and the way to support the project).
 private const val NEWS_URL = "https://linktr.ee/lamayne"

@@ -5,6 +5,9 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lamayne.iptv.tv.data.BrowseController
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.lamayne.iptv.tv.data.AccountInfo
 import com.lamayne.iptv.tv.data.Category
 import com.lamayne.iptv.tv.data.Channel
@@ -46,6 +49,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -76,6 +83,13 @@ sealed interface Route {
 data class ActorResult(val movies: List<Movie>, val actorFound: Boolean, val filmCount: Int)
 
 enum class StepState { RUNNING, DONE, FAILED }
+
+// Why a title is shown under "Similar".
+enum class SimilarReason { GENRE, DIRECTOR, CAST, CATEGORY }
+
+data class SimilarMovie(val movie: Movie, val reason: SimilarReason)
+
+data class SimilarShow(val series: Series, val reason: SimilarReason)
 
 // The three steps of the lookup, shown while the page loads.
 data class ActorProgress(
@@ -138,13 +152,25 @@ private val CATEGORY_TAG = Regex("^\\s*[|\\[(]?\\s*([A-Za-z]{2,3})\\s*[|\\])]")
 private fun categoryTag(name: String): String? =
     CATEGORY_TAG.find(name)?.groupValues?.get(1)?.uppercase(Locale.ROOT)
 
-// The country tags that go with a language of the app.
-private fun tagsFor(language: String): Set<String> =
-    when (language) {
-        "fr" -> setOf("FR", "FRA")
-        "es" -> setOf("ES", "SP", "ESP", "LAT")
-        else -> setOf("EN", "US", "UK", "GB", "ENG", "USA")
-    }
+// The languages a provider tags its categories with ("|FR| ...", "EN| ..."), and the tags of each.
+private val LANGUAGES: Map<String, Set<String>> = linkedMapOf(
+    "fr" to setOf("FR", "FRA"),
+    "en" to setOf("EN", "US", "UK", "GB", "ENG", "USA"),
+    "es" to setOf("ES", "SP", "ESP", "LAT"),
+    "de" to setOf("DE", "GER", "DEU"),
+    "it" to setOf("IT", "ITA"),
+    "pt" to setOf("PT", "BR", "POR"),
+    "ar" to setOf("AR", "ARA"),
+    "nl" to setOf("NL", "DUT"),
+    "tr" to setOf("TR", "TUR"),
+    "pl" to setOf("PL", "POL"),
+    "ru" to setOf("RU", "RUS"),
+)
+
+private fun tagsFor(language: String): Set<String> = LANGUAGES[language] ?: LANGUAGES.getValue("en")
+
+private fun languageOfTag(tag: String): String? =
+    LANGUAGES.entries.firstOrNull { tag in it.value }?.key
 
 private fun pickLatest(categories: List<Category>, hidden: Set<String>, tags: Set<String>): Category? {
     val visible = categories.filter { it.id !in hidden }
@@ -165,7 +191,7 @@ private fun recentMovies(items: List<Movie>): List<Movie> {
     val thisYear = Calendar.getInstance().get(Calendar.YEAR)
 
     return items
-        .filter { (it.year ?: thisYear) >= thisYear - 2 }
+        .filter { !it.poster.isNullOrBlank() && (it.year ?: thisYear) >= thisYear - 2 }
         .sortedWith(
             compareByDescending<Movie> { (it.year ?: 0) >= thisYear - 1 }
                 .thenByDescending { it.added }
@@ -177,7 +203,7 @@ private fun recentSeries(items: List<Series>): List<Series> {
     val thisYear = Calendar.getInstance().get(Calendar.YEAR)
 
     return items
-        .filter { (it.year ?: thisYear) >= thisYear - 2 }
+        .filter { !it.poster.isNullOrBlank() && (it.year ?: thisYear) >= thisYear - 2 }
         .sortedWith(
             compareByDescending<Series> { (it.year ?: 0) >= thisYear - 1 }
                 .thenByDescending { it.added }
@@ -266,6 +292,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         { c, id -> XtreamClient.series(c, id) },
         { _hiddenSeries.value },
     )
+
+    // The language of the home recommendations ("auto" = the language of the app).
+    private val _homeLanguage = MutableStateFlow(settings.homeLanguage)
+    val homeLanguage: StateFlow<String> = _homeLanguage.asStateFlow()
+
+    // The languages really present in the categories (the ones hidden by the user do not count).
+    val availableHomeLanguages: StateFlow<List<String>> =
+        combine(movies.categories, series.categories, _hiddenMovies, _hiddenSeries) { movieList, seriesList, hiddenMovies, hiddenSeries ->
+            val found = HashSet<String>()
+
+            for (category in movieList) {
+                if (category.id !in hiddenMovies) categoryTag(category.name)?.let { tag -> languageOfTag(tag)?.let { found.add(it) } }
+            }
+
+            for (category in seriesList) {
+                if (category.id !in hiddenSeries) categoryTag(category.name)?.let { tag -> languageOfTag(tag)?.let { found.add(it) } }
+            }
+
+            LANGUAGES.keys.filter { it in found }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ------------------------------------------------------------------ favourites, history
 
@@ -616,6 +662,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return if (chosen != "system") chosen else Locale.getDefault().language
     }
 
+    private fun homeLanguageCode(): String =
+        settings.homeLanguage.takeIf { it != "auto" } ?: contentLanguage()
+
+    fun setHomeLanguage(code: String) {
+        settings.homeLanguage = code
+        _homeLanguage.value = code
+
+        val credentials = _credentials.value ?: return
+
+        _featured.value = emptyList()
+        loadHome(credentials)
+    }
+
     // Changing the language reloads what depends on it.
     fun setLanguage(code: String) {
         settings.language = code
@@ -681,7 +740,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun back() {
         val current = _stack.value
 
-        if (current.isNotEmpty()) _stack.value = current.dropLast(1)
+        if (current.isEmpty()) return
+
+        val next = current.dropLast(1)
+
+        _stack.value = next
+
+        // The page underneath (a film opened from a similar title, then Back) gets its own
+        // information back; nothing is loaded again when it is already the one shown.
+        when (val top = next.lastOrNull()) {
+            is Route.MovieDetails -> if (top.movie.id != shownMovieId) loadMovieInfo(top.movie)
+            is Route.SeriesDetails -> if (top.series.id != shownSeriesId) loadSeriesInfo(top.series)
+            else -> Unit
+        }
     }
 
     private fun replaceTop(route: Route) {
@@ -1076,14 +1147,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ------------------------------------------------------------------ details
 
+    private var shownMovieId: String? = null
+    private var shownSeriesId: String? = null
+    private val movieInfoCache = HashMap<String, MediaInfo>()
+    private val infoSemaphore = Semaphore(3)
+
     private fun loadMovieInfo(movie: Movie) {
         val credentials = _credentials.value ?: return
 
+        shownMovieId = movie.id
         infoJob?.cancel()
+
+        val cached = movieInfoCache[movie.id]
+
+        if (cached != null) {
+            _movieInfo.value = Loadable.Ready(cached)
+            loadSimilarMovies(movie, cached)
+            return
+        }
+
         _movieInfo.value = Loadable.Loading
         infoJob = viewModelScope.launch {
             try {
-                _movieInfo.value = Loadable.Ready(XtreamClient.movieInfo(credentials, movie.id))
+                val info = XtreamClient.movieInfo(credentials, movie.id)
+
+                movieInfoCache[movie.id] = info
+                _movieInfo.value = Loadable.Ready(info)
+                loadSimilarMovies(movie, info)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1095,15 +1185,198 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadSeriesInfo(series: Series) {
         val credentials = _credentials.value ?: return
 
+        shownSeriesId = series.id
         infoJob?.cancel()
         _seriesInfo.value = Loadable.Loading
         infoJob = viewModelScope.launch {
             try {
-                _seriesInfo.value = Loadable.Ready(cachedSeriesInfo(credentials, series.id))
+                val loaded = cachedSeriesInfo(credentials, series.id)
+
+                _seriesInfo.value = Loadable.Ready(loaded)
+                loadSimilarSeries(series, loaded.info)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _seriesInfo.value = Loadable.Failed(toUiError(e))
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ similar titles
+
+    private val _similarMovies = MutableStateFlow<List<SimilarMovie>>(emptyList())
+    val similarMovies: StateFlow<List<SimilarMovie>> = _similarMovies.asStateFlow()
+
+    private val _similarShows = MutableStateFlow<List<SimilarShow>>(emptyList())
+    val similarShows: StateFlow<List<SimilarShow>> = _similarShows.asStateFlow()
+
+    private val _similarLoading = MutableStateFlow(false)
+    val similarLoading: StateFlow<Boolean> = _similarLoading.asStateFlow()
+
+    private var similarJob: Job? = null
+
+    private fun names(text: String?): Set<String> =
+        text.orEmpty()
+            .split(',', ';', '/', '|')
+            .map { it.trim().lowercase(Locale.ROOT) }
+            .filter { it.isNotEmpty() }
+            .toSet()
+
+    // Same scoring as the Windows app: shared genres first, then director, then cast; being in
+    // the same category counts a little.
+    private fun scoreOf(wanted: MediaInfo, other: MediaInfo): Pair<Int, SimilarReason> {
+        val genres = names(wanted.genre).intersect(names(other.genre)).size
+        val directors = names(wanted.director).intersect(names(other.director)).size
+        val cast = names(wanted.cast).intersect(names(other.cast)).size
+        var score = 5
+        var reason = SimilarReason.CATEGORY
+
+        if (genres > 0) {
+            score += genres * 100
+            reason = SimilarReason.GENRE
+        }
+
+        if (directors > 0) {
+            score += 80
+
+            if (reason == SimilarReason.CATEGORY) reason = SimilarReason.DIRECTOR
+        }
+
+        if (cast > 0) {
+            score += minOf(cast, 4) * 20
+
+            if (reason == SimilarReason.CATEGORY) reason = SimilarReason.CAST
+        }
+
+        return score to reason
+    }
+
+    private fun yearGap(year: Int?, base: Int?): Int =
+        if (year == null || base == null) 50 else abs(year - base)
+
+    private suspend fun movieInfoOf(credentials: Credentials, id: String): MediaInfo? {
+        movieInfoCache[id]?.let { return it }
+
+        return try {
+            infoSemaphore.withPermit { XtreamClient.movieInfo(credentials, id) }.also { movieInfoCache[id] = it }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // First the titles of the same category (closest year, best rated), shown at once; then the
+    // closest ones are looked at in detail and put in order by what they share with this title.
+    private fun loadSimilarMovies(movie: Movie, info: MediaInfo) {
+        val credentials = _credentials.value ?: return
+        val categoryId = movie.categoryId ?: return
+
+        similarJob?.cancel()
+        _similarMovies.value = emptyList()
+        _similarShows.value = emptyList()
+        _similarLoading.value = true
+        similarJob = viewModelScope.launch {
+            try {
+                val baseYear = info.year?.take(4)?.toIntOrNull() ?: movie.year
+                val pool = XtreamClient.movies(credentials, categoryId)
+                    .filter { it.id != movie.id && !it.poster.isNullOrBlank() }
+                val ordered = pool.sortedWith(
+                    compareBy<Movie> { yearGap(it.year, baseYear) }
+                        .thenByDescending { it.rating?.toDoubleOrNull() ?: 0.0 }
+                )
+
+                _similarMovies.value = ordered.take(12).map { SimilarMovie(it, SimilarReason.CATEGORY) }
+                _similarLoading.value = false
+
+                if (names(info.genre).isEmpty() && names(info.director).isEmpty() && names(info.cast).isEmpty()) {
+                    return@launch
+                }
+
+                val scored = coroutineScope {
+                    ordered.take(18)
+                        .map { candidate ->
+                            async { movieInfoOf(credentials, candidate.id)?.let { other -> candidate to scoreOf(info, other) } }
+                        }
+                        .awaitAll()
+                }.filterNotNull()
+
+                if (scored.isEmpty()) return@launch
+
+                val best = scored.sortedByDescending { it.second.first }.take(12)
+                val rest = ordered.filter { item -> best.none { it.first.id == item.id } }
+
+                _similarMovies.value =
+                    (best.map { SimilarMovie(it.first, it.second.second) } +
+                        rest.map { SimilarMovie(it, SimilarReason.CATEGORY) }).take(12)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // no similar titles shown
+            } finally {
+                _similarLoading.value = false
+            }
+        }
+    }
+
+    private fun loadSimilarSeries(series: Series, info: MediaInfo) {
+        val credentials = _credentials.value ?: return
+        val categoryId = series.categoryId ?: return
+
+        similarJob?.cancel()
+        _similarMovies.value = emptyList()
+        _similarShows.value = emptyList()
+        _similarLoading.value = true
+        similarJob = viewModelScope.launch {
+            try {
+                val baseYear = info.year?.take(4)?.toIntOrNull() ?: series.year
+                val pool = XtreamClient.series(credentials, categoryId)
+                    .filter { it.id != series.id && !it.poster.isNullOrBlank() }
+                val ordered = pool.sortedWith(
+                    compareBy<Series> { yearGap(it.year, baseYear) }
+                        .thenByDescending { it.rating?.toDoubleOrNull() ?: 0.0 }
+                )
+
+                _similarShows.value = ordered.take(12).map { SimilarShow(it, SimilarReason.CATEGORY) }
+                _similarLoading.value = false
+
+                if (names(info.genre).isEmpty() && names(info.director).isEmpty() && names(info.cast).isEmpty()) {
+                    return@launch
+                }
+
+                // a series page is heavy (all its episodes): fewer are looked at
+                val scored = coroutineScope {
+                    ordered.take(8)
+                        .map { candidate ->
+                            async {
+                                try {
+                                    val other = infoSemaphore.withPermit { cachedSeriesInfo(credentials, candidate.id).info }
+
+                                    candidate to scoreOf(info, other)
+                                } catch (e: CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                        }
+                        .awaitAll()
+                }.filterNotNull()
+
+                if (scored.isEmpty()) return@launch
+
+                val best = scored.sortedByDescending { it.second.first }.take(12)
+                val rest = ordered.filter { item -> best.none { it.first.id == item.id } }
+
+                _similarShows.value =
+                    (best.map { SimilarShow(it.first, it.second.second) } +
+                        rest.map { SimilarShow(it, SimilarReason.CATEGORY) }).take(12)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // no similar titles shown
+            } finally {
+                _similarLoading.value = false
             }
         }
     }
@@ -1291,7 +1564,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _homeError.value = null
 
             try {
-                val tags = tagsFor(contentLanguage())
+                val tags = tagsFor(homeLanguageCode())
                 val movieCategory = pickLatest(XtreamClient.movieCategories(credentials), _hiddenMovies.value, tags)
                 val seriesCategory = pickLatest(XtreamClient.seriesCategories(credentials), _hiddenSeries.value, tags)
 
@@ -1318,67 +1591,95 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Up to 5 highlights, movie and series in turn. Each one appears as soon as
-    // its details (plot, big picture) have arrived.
+    // Up to 5 highlights, movie and series in turn. A highlight must have a SYNOPSIS and a
+    // PICTURE that really loads; the others are skipped and the next titles are tried
+    // (4 at a time). Each one appears as soon as it is ready.
     private suspend fun buildFeatured(
         credentials: Credentials,
         latestMovies: List<Movie>,
         latestSeries: List<Series>,
     ) {
-        val movieQueue = latestMovies.filter { it.poster != null }.take(3)
-        val seriesQueue = latestSeries.filter { it.poster != null }.take(2)
+        val candidates = ArrayList<Any>()
+
+        for (position in 0 until 10) {
+            latestMovies.getOrNull(position)?.let { candidates.add(it) }
+            latestSeries.getOrNull(position)?.let { candidates.add(it) }
+        }
+
         val slides = ArrayList<Featured>()
 
-        for (index in 0 until maxOf(movieQueue.size, seriesQueue.size)) {
-            val movie = movieQueue.getOrNull(index)
-            val serie = seriesQueue.getOrNull(index)
-
-            if (movie != null) {
-                try {
-                    val info = XtreamClient.movieInfo(credentials, movie.id)
-
-                    slides.add(
-                        Featured(
-                            kind = MediaKind.MOVIE,
-                            movie = movie,
-                            series = null,
-                            title = movie.name,
-                            backdrop = info.backdrop ?: movie.poster,
-                            meta = metaOf(info, movie.rating),
-                            plot = info.plot,
-                        )
-                    )
-                    _featured.value = slides.toList()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // this one is skipped
-                }
+        for (group in candidates.chunked(4)) {
+            val built = coroutineScope {
+                group.map { candidate -> async { buildSlide(credentials, candidate) } }.awaitAll()
             }
 
-            if (serie != null) {
-                try {
-                    val info = cachedSeriesInfo(credentials, serie.id).info
+            for (slide in built) {
+                if (slide != null && slides.size < 5) slides.add(slide)
+            }
 
-                    slides.add(
+            _featured.value = slides.toList()
+
+            if (slides.size >= 5) break
+        }
+    }
+
+    private suspend fun buildSlide(credentials: Credentials, candidate: Any): Featured? =
+        try {
+            when (candidate) {
+                is Movie -> {
+                    val info = XtreamClient.movieInfo(credentials, candidate.id)
+                    val image = info.backdrop?.takeIf { it.isNotBlank() } ?: candidate.poster
+
+                    if (hasPlot(info.plot) && imageLoads(image)) {
+                        Featured(
+                            kind = MediaKind.MOVIE,
+                            movie = candidate,
+                            series = null,
+                            title = candidate.name,
+                            backdrop = image,
+                            meta = metaOf(info, candidate.rating),
+                            plot = info.plot,
+                        )
+                    } else {
+                        null
+                    }
+                }
+                is Series -> {
+                    val info = cachedSeriesInfo(credentials, candidate.id).info
+                    val image = info.backdrop?.takeIf { it.isNotBlank() } ?: candidate.poster
+
+                    if (hasPlot(info.plot) && imageLoads(image)) {
                         Featured(
                             kind = MediaKind.SERIES,
                             movie = null,
-                            series = serie,
-                            title = serie.name,
-                            backdrop = info.backdrop ?: serie.poster,
-                            meta = metaOf(info, serie.rating),
+                            series = candidate,
+                            title = candidate.name,
+                            backdrop = image,
+                            meta = metaOf(info, candidate.rating),
                             plot = info.plot,
                         )
-                    )
-                    _featured.value = slides.toList()
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // this one is skipped
+                    } else {
+                        null
+                    }
                 }
+                else -> null
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
         }
+
+    private fun hasPlot(plot: String?): Boolean = (plot?.trim()?.length ?: 0) >= 30
+
+    // The picture is downloaded now (it is then in the cache, so it shows at once).
+    private suspend fun imageLoads(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+
+        val app = getApplication<Application>()
+        val request = ImageRequest.Builder(app).data(url).build()
+
+        return app.imageLoader.execute(request) is SuccessResult
     }
 
     // ------------------------------------------------------------------ search

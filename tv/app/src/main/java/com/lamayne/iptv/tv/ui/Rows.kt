@@ -273,6 +273,7 @@ private fun SpecialRow(
     icon: @Composable () -> Unit,
     selected: Boolean,
     onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
 ) {
     FocusCard(
         onClick = onClick,
@@ -280,6 +281,7 @@ private fun SpecialRow(
         shape = RoundedCornerShape(10.dp),
         container = if (selected) AccentDeep else Color.Transparent,
         focusedScale = 1.02f,
+        focusRequester = focusRequester,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
@@ -309,6 +311,8 @@ fun CategoryPanel(
     onFavorites: () -> Unit,
     onSearch: () -> Unit,
     onRecent: () -> Unit,
+    favoritesFocus: FocusRequester,
+    recentFocus: FocusRequester,
     onSelect: (Category) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -360,6 +364,7 @@ fun CategoryPanel(
                     },
                     selected = mode == BrowseMode.FAVORITES,
                     onClick = onFavorites,
+                    focusRequester = favoritesFocus,
                 )
             }
 
@@ -376,6 +381,7 @@ fun CategoryPanel(
                     },
                     selected = mode == BrowseMode.RECENT,
                     onClick = onRecent,
+                    focusRequester = recentFocus,
                 )
             }
 
@@ -478,6 +484,8 @@ fun <T : Any> BrowsePage(
     }
     val firstFocus = remember { FocusRequester() }
     val searchFocus = remember { FocusRequester() }
+    val favoritesFocus = remember { FocusRequester() }
+    val recentFocus = remember { FocusRequester() }
 
     val shown = when (mode) {
         BrowseMode.FAVORITES -> favorites
@@ -499,6 +507,15 @@ fun <T : Any> BrowsePage(
         enabled = mode != BrowseMode.SEARCH && shown.isNotEmpty(),
         requester = firstFocus,
     )
+
+    // Nothing to select on the right (no favourite, nothing watched yet): the cursor goes to the
+    // entry of the left menu that is shown, so that Down goes to the next entry, not up to Search.
+    LaunchedEffect(mode, shown.isEmpty()) {
+        if (shown.isEmpty()) {
+            if (mode == BrowseMode.FAVORITES) runCatching { favoritesFocus.requestFocus() }
+            else if (mode == BrowseMode.RECENT) runCatching { recentFocus.requestFocus() }
+        }
+    }
 
     // On entering the search, the cursor goes to the text field (not when coming back
     // from a result: the typed text and the results are still there).
@@ -522,6 +539,8 @@ fun <T : Any> BrowsePage(
             selectedId = selected?.id,
             onFavorites = { changeMode(BrowseMode.FAVORITES) },
             onRecent = { changeMode(BrowseMode.RECENT) },
+            favoritesFocus = favoritesFocus,
+            recentFocus = recentFocus,
             onSearch = {
                 changeMode(BrowseMode.SEARCH)
                 viewModel.beginSearch(kind)

@@ -33,6 +33,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -78,6 +79,8 @@ fun ActionButton(
     primary: Boolean = false,
     focusRequester: FocusRequester? = null,
     icon: (@Composable () -> Unit)? = null,
+    // In a row of equal buttons: the button takes all its place and its content is centred.
+    fill: Boolean = false,
 ) {
     FocusCard(
         onClick = onClick,
@@ -90,7 +93,9 @@ fun ActionButton(
         focusRequester = focusRequester,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
+            modifier = (if (fill) Modifier.fillMaxWidth() else Modifier)
+                .padding(horizontal = 22.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null) {
@@ -98,7 +103,15 @@ fun ActionButton(
                 Spacer(Modifier.width(10.dp))
             }
 
-            Text(text, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(
+                text,
+                color = Color.White,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -165,6 +178,7 @@ fun PosterCard(
     progress: Float? = null,
     favorite: Boolean = false,
     rating: String? = null,
+    caption: String? = null,
     focusRequester: FocusRequester? = null,
     onFocused: () -> Unit = {},
     onLongClick: (() -> Unit)? = null,
@@ -189,15 +203,29 @@ fun PosterCard(
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xEE07070D))))
                     .padding(start = 8.dp, end = 8.dp, top = 22.dp, bottom = if (progress != null) 16.dp else 8.dp),
             ) {
-                Text(
-                    title,
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    lineHeight = 14.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Column {
+                    Text(
+                        title,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        lineHeight = 14.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+
+                    if (caption != null) {
+                        Text(
+                            caption,
+                            color = AccentBright,
+                            fontSize = 9.sp,
+                            lineHeight = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
 
             if (progress != null) {
@@ -326,18 +354,6 @@ fun ChannelTile(
                 contentAlignment = Alignment.Center,
             ) {
                 ChannelLogo(channel, Modifier.fillMaxSize().padding(14.dp))
-
-                if (nowTitle != null) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp)
-                            .background(LiveRed, RoundedCornerShape(4.dp))
-                            .padding(horizontal = 5.dp, vertical = 1.dp),
-                    ) {
-                        Text("LIVE", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                    }
-                }
             }
 
             Text(
