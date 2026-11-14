@@ -305,6 +305,9 @@ export default function MpvPlayer({
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPip, setIsPip] = useState(false);
+  // Mode théâtre : la vidéo remplit la fenêtre, sans le menu ni le reste de la page
+  // (la fenêtre n'est pas passée en plein écran).
+  const [isTheatre, setIsTheatre] = useState(false);
   const [resumeOffer, setResumeOffer] =
     useState<PlaybackProgress | null>(null);
   const [resumeBusy, setResumeBusy] = useState(false);
@@ -412,6 +415,19 @@ export default function MpvPlayer({
       document.documentElement.classList.remove("mpv-pip");
     };
   }, [isPip]);
+
+
+  useEffect(() => {
+    document.documentElement.classList.toggle(
+      "mpv-theatre",
+      isTheatre
+    );
+
+
+    return () => {
+      document.documentElement.classList.remove("mpv-theatre");
+    };
+  }, [isTheatre]);
 
 
   useEffect(() => {
@@ -1074,7 +1090,7 @@ export default function MpvPlayer({
       window.removeEventListener("resize", schedule);
       window.removeEventListener("scroll", schedule, true);
     };
-  }, [ready, isFullscreen, isPip]);
+  }, [ready, isFullscreen, isPip, isTheatre]);
 
   useEffect(() => {
     const win = getCurrentWindow();
@@ -1466,6 +1482,31 @@ export default function MpvPlayer({
   }
 
 
+  // Mode théâtre : plus de menu autour de la vidéo, mais la fenêtre reste telle quelle
+  // (ni plein écran, ni PiP). Échap ou la touche T pour revenir.
+  async function toggleTheatre() {
+    if (transitionBusyRef.current) return;
+    transitionBusyRef.current = true;
+
+
+    try {
+      setNotice("");
+
+
+      // Le PiP est une petite fenêtre : on la quitte d'abord.
+      if (pipRef.current) {
+        await restorePipWindow();
+      }
+
+
+      setIsTheatre((current) => !current);
+    } finally {
+      transitionBusyRef.current = false;
+      revealControls();
+    }
+  }
+
+
   // En PiP, on peut déplacer la fenêtre en tirant n'importe où sur la vidéo.
   // Un simple clic (play/pause) reste un clic : le déplacement ne démarre
   // qu'après quelques pixels de mouvement bouton enfoncé.
@@ -1514,6 +1555,9 @@ export default function MpvPlayer({
 
 
       const win = getCurrentWindow();
+
+
+      setIsTheatre(false);
 
 
       if (await win.isFullscreen()) {
@@ -1649,7 +1693,8 @@ export default function MpvPlayer({
   // Raccourcis clavier du lecteur (mêmes touches que YouTube et VLC) :
   //   Espace / K  lecture - pause        ← / → ou J / L  reculer / avancer de 10 s
   //   Maj + ← / →  ±60 s                 ↑ / ↓  volume    M  muet
-  //   F  plein écran    P  image dans l'image    Échap  quitter plein écran / PiP
+  //   F  plein écran    P  image dans l'image    T  mode théâtre
+  //   Échap  quitter plein écran / théâtre / PiP
   //   Page haut / bas  chaîne précédente / suivante (en direct)
   const shortcutsRef = useRef({
     togglePause,
@@ -1658,12 +1703,14 @@ export default function MpvPlayer({
     toggleMute,
     toggleFullscreen,
     togglePip,
+    toggleTheatre,
     changeChannel,
     revealControls,
     volume,
     isLive,
     isFullscreen,
     isPip,
+    isTheatre,
     resumeOffer: Boolean(resumeOffer),
   });
 
@@ -1674,14 +1721,34 @@ export default function MpvPlayer({
     toggleMute,
     toggleFullscreen,
     togglePip,
+    toggleTheatre,
     changeChannel,
     revealControls,
     volume,
     isLive,
     isFullscreen,
     isPip,
+    isTheatre,
     resumeOffer: Boolean(resumeOffer),
   };
+
+  // Bouton « précédent » de la souris : quitte le plein écran, le mode théâtre ou le PiP
+  // (hors de ces modes, c'est l'application qui revient à la page précédente).
+  useEffect(() => {
+    function onMouseUp(event: MouseEvent) {
+      if (event.button !== 3) return;
+
+      const s = shortcutsRef.current;
+
+      if (s.isFullscreen) void s.toggleFullscreen();
+      else if (s.isTheatre) void s.toggleTheatre();
+      else if (s.isPip) void s.togglePip();
+    }
+
+    window.addEventListener("mouseup", onMouseUp);
+
+    return () => window.removeEventListener("mouseup", onMouseUp);
+  }, []);
 
   useEffect(() => {
     let spaceHandled = false;
@@ -1709,6 +1776,7 @@ export default function MpvPlayer({
 
       if (event.key === "Escape") {
         if (s.isFullscreen) void s.toggleFullscreen();
+        else if (s.isTheatre) void s.toggleTheatre();
         else if (s.isPip) void s.togglePip();
 
         return;
@@ -1782,6 +1850,12 @@ export default function MpvPlayer({
           if (event.repeat) return;
 
           void s.togglePip();
+          return;
+
+        case "t":
+          if (event.repeat) return;
+
+          void s.toggleTheatre();
           return;
 
         case "PageUp":
@@ -2004,7 +2078,7 @@ export default function MpvPlayer({
   return (
     <div
       className={
-        isFullscreen || isPip
+        isFullscreen || isPip || isTheatre
           ? "mpv-root fixed inset-0 z-[100] overflow-hidden bg-transparent"
           : "mpv-root relative h-full w-full overflow-hidden rounded-2xl bg-transparent"
       }
@@ -2465,6 +2539,29 @@ export default function MpvPlayer({
                     }}
                   />
                 )}
+
+                <ControlButton compact={isPip}
+                  title={t("player.theatre")}
+                  active={isTheatre}
+                  onClick={() => void toggleTheatre()}
+                >
+                  {/* Un écran large : avec le menu à droite quand il est affiché,
+                      seul quand le menu est masqué. */}
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                    {!isTheatre && <line x1="16" y1="5" x2="16" y2="19" />}
+                  </svg>
+                </ControlButton>
+
 
                 <ControlButton compact={isPip}
                   title={t("player.pip")}

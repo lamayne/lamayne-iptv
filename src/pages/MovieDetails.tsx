@@ -37,7 +37,6 @@ import {
 } from '@/utils/playbackProgress';
 import { errorText } from '@/i18n/backendErrors';
 import { backLabelFor } from '@/utils/backLabel';
-
 import {
   buildTitleIndex,
   loadFilmography,
@@ -1141,6 +1140,7 @@ export default function MovieDetails() {
               'all'
             )
           }
+          data-nav-back
           className="mt-4 rounded-lg bg-accent-600 px-4 py-2 text-sm text-white"
         >
           {t(
@@ -1159,6 +1159,7 @@ export default function MovieDetails() {
           onClick={() =>
             setPlayingKey(null)
           }
+          data-nav-back
           className="mb-4 flex items-center gap-2 text-sm text-zinc-400 hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -1202,6 +1203,7 @@ export default function MovieDetails() {
             'all'
           )
         }
+        data-nav-back
         className="mb-5 flex items-center gap-2 text-sm text-zinc-400 hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" />

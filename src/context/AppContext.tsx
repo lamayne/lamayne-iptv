@@ -129,6 +129,10 @@ interface AppContextValue
   returnFromPlayer: (fallbackPage: Page, fallbackSub?: SubPage) => void;
   // Page où ramènera le prochain retour (pour afficher « Retour à… »).
   peekReturn: () => { page: Page; sub: SubPage } | null;
+  // Boutons latéraux de la souris : page précédente / suivante (historique des pages).
+  // Renvoient false quand il n'y a nulle part où aller.
+  goBack: () => boolean;
+  goForward: () => boolean;
 
   language: Language;
   setLanguage: (language: Language) => void;
@@ -1120,6 +1124,65 @@ return Array.from(names)
 
     return stack.length ? stack[stack.length - 1] : null;
   }, []);
+
+  // Historique des pages pour les boutons latéraux de la souris, comme dans un navigateur.
+  // Le lecteur n'y figure pas : son bouton « Retour » sait où revenir.
+  const pageHistoryRef = useRef<{
+    entries: Array<{ page: Page; sub: SubPage }>;
+    index: number;
+  }>({ entries: [{ page: currentPage, sub: activeSubPage }], index: 0 });
+
+  useEffect(() => {
+    if (currentPage === 'player') return;
+
+    const history = pageHistoryRef.current;
+    const current = history.entries[history.index];
+
+    if (current && current.page === currentPage && current.sub === activeSubPage) {
+      return;
+    }
+
+    history.entries = [
+      ...history.entries.slice(0, history.index + 1),
+      { page: currentPage, sub: activeSubPage },
+    ].slice(-30);
+    history.index = history.entries.length - 1;
+  }, [currentPage, activeSubPage]);
+
+  const walkHistory = useCallback((direction: -1 | 1) => {
+    const history = pageHistoryRef.current;
+
+    // Depuis le lecteur, « précédent » ramène à la page d'où la lecture est partie
+    // (la dernière page enregistrée), pas à celle d'avant.
+    let index =
+      currentPageRef.current === 'player' && direction === -1
+        ? history.index
+        : history.index + direction;
+
+    // Une entrée identique à la page affichée ne changerait rien : on la saute.
+    while (index >= 0 && index < history.entries.length) {
+      const entry = history.entries[index];
+
+      if (
+        entry.page !== currentPageRef.current ||
+        entry.sub !== activeSubPageRef.current
+      ) {
+        history.index = index;
+        returnStackRef.current = [];
+        setCurrentPageState(entry.page);
+        setActiveSubPage(entry.sub);
+
+        return true;
+      }
+
+      index += direction;
+    }
+
+    return false;
+  }, []);
+
+  const goBack = useCallback(() => walkHistory(-1), [walkHistory]);
+  const goForward = useCallback(() => walkHistory(1), [walkHistory]);
 
   const showToast = useCallback(
     (
@@ -2164,6 +2227,8 @@ return Array.from(names)
     navigate,
     returnFromPlayer,
     peekReturn,
+    goBack,
+    goForward,
 
     language,
     setLanguage,

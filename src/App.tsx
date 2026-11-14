@@ -28,6 +28,8 @@ function MainContent() {
     savedSourcesError,
     importedChannels,
     navigate,
+    goBack,
+    goForward,
     showToast,
     t,
   } = useApp();
@@ -72,6 +74,54 @@ function MainContent() {
   useEffect(() => {
     previousPageRef.current = currentPage;
   }, [currentPage]);
+
+  // Boutons latéraux de la souris : « précédent » ferme l'écran ouvert (c'est le bouton
+  // Retour affiché qui est actionné) ou revient à la page d'avant ; « suivant » avance
+  // dans l'historique des pages.
+  useEffect(() => {
+    function onMouse(event: MouseEvent) {
+      if (event.button !== 3 && event.button !== 4) return;
+
+      // L'application n'utilise pas l'historique du navigateur : on l'empêche d'agir.
+      event.preventDefault();
+
+      if (event.type !== 'mouseup') return;
+
+      // En plein écran, en mode théâtre ou en PiP, c'est le lecteur qui répond d'abord.
+      const mode = document.documentElement.classList;
+
+      if (
+        mode.contains('mpv-fullscreen') ||
+        mode.contains('mpv-theatre') ||
+        mode.contains('mpv-pip')
+      ) {
+        return;
+      }
+
+      if (event.button === 3) {
+        const back = Array.from(
+          document.querySelectorAll<HTMLElement>('[data-nav-back]')
+        ).find((element) => element.getClientRects().length > 0);
+
+        if (back) back.click();
+        else goBack();
+
+        return;
+      }
+
+      goForward();
+    }
+
+    window.addEventListener('mousedown', onMouse, true);
+    window.addEventListener('mouseup', onMouse, true);
+    window.addEventListener('auxclick', onMouse, true);
+
+    return () => {
+      window.removeEventListener('mousedown', onMouse, true);
+      window.removeEventListener('mouseup', onMouse, true);
+      window.removeEventListener('auxclick', onMouse, true);
+    };
+  }, [goBack, goForward]);
 
   // La recherche est effacée à chaque changement de page, sauf au retour du
   // lecteur : on retrouve alors ses résultats.

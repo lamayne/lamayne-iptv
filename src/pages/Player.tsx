@@ -581,6 +581,7 @@ export default function Player() {
       <button
         type="button"
         onClick={handleBack}
+        data-nav-back
         className="mb-4 flex items-center gap-2 text-sm text-zinc-400 hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" />

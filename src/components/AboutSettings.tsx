@@ -226,6 +226,7 @@ export default function AboutSettings() {
               label={t('about.image_dans_l_image')}
               keys={<Kbd>P</Kbd>}
             />
+            <Shortcut label={t('player.theatre')} keys={<Kbd>T</Kbd>} />
             <Shortcut
               label={t('about.chaine_precedente_suivante')}
               keys={
@@ -283,6 +284,10 @@ export default function AboutSettings() {
             <Shortcut
               label={t('about.effacer_la_recherche')}
               keys={<Kbd>{t('about.echap')}</Kbd>}
+            />
+            <Shortcut
+              label={t('about.souris_precedent_suivant')}
+              keys={<Kbd>{t('about.souris_boutons_lateraux')}</Kbd>}
             />
           </ul>
 

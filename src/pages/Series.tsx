@@ -1510,6 +1510,7 @@ export default function Series() {
           onClick={
             closeDetails
           }
+          data-nav-back
           className="mb-5 flex items-center gap-2 rounded-lg bg-surface-800 px-3 py-2 text-sm text-zinc-300 hover:bg-surface-700"
         >
           <ChevronLeft className="h-4 w-4" />

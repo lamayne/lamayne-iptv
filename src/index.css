@@ -56,16 +56,20 @@ html.mpv-active .app-main {
   background-color: transparent !important;
 }
 
-/* Masquer l'interface sans modifier sa mise en page. */
+/* Masquer l'interface sans modifier sa mise en page (plein écran, PiP et mode théâtre :
+   en mode théâtre la fenêtre garde sa taille, seule la vidéo prend toute la place). */
 html.mpv-fullscreen .app-root *,
-html.mpv-pip .app-root * {
+html.mpv-pip .app-root *,
+html.mpv-theatre .app-root * {
   visibility: hidden !important;
 }
 
 html.mpv-fullscreen .app-root .mpv-root,
 html.mpv-fullscreen .app-root .mpv-root *,
 html.mpv-pip .app-root .mpv-root,
-html.mpv-pip .app-root .mpv-root * {
+html.mpv-pip .app-root .mpv-root *,
+html.mpv-theatre .app-root .mpv-root,
+html.mpv-theatre .app-root .mpv-root * {
   visibility: visible !important;
 }
 
