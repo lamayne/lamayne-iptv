@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LAMAYNE IPTV</string>
-    <string name="account_connections">Conexiones en uso: %1$d de %2$d</string>
-    <string name="account_days_left">Suscripción: quedan %1$d día(s) (hasta el %2$s)</string>
-    <string name="account_expired">Suscripción caducada el %1$s</string>
-    <string name="account_trial">Cuenta de prueba</string>
-    <string name="account_unlimited">Suscripción: sin fecha de caducidad</string>
     <string name="actor_elapsed">%1$d s</string>
     <string name="actor_loading_hint">Está trabajando. Atrás para cancelar.</string>
     <string name="actor_none">No se encontró ninguna película</string>
@@ -129,17 +124,15 @@
     <string name="series_count">%1$d series</string>
     <string name="settings_account">Cuenta</string>
     <string name="settings_account_as">Sesión iniciada como %1$s en %2$s</string>
-    <string name="settings_app_language">Idioma de la app</string>
     <string name="settings_clear_history">Borrar historial de reproducción</string>
     <string name="settings_cleared">Hecho.</string>
     <string name="settings_disclaimer">LAMAYNE IPTV es un reproductor: no proporciona contenido. Usa solo fuentes que estés autorizado a usar.</string>
     <string name="settings_language">Idioma</string>
     <string name="settings_language_auto">Automático</string>
+    <string name="settings_language_hint">Idioma de la aplicación. El inicio prioriza las películas y series cuya sinopsis está en este idioma.</string>
     <string name="settings_off">Desactivado</string>
     <string name="settings_on">Activado</string>
     <string name="settings_playback_history">Reproducción e historial</string>
-    <string name="settings_reco">Recomendaciones del inicio</string>
-    <string name="settings_reco_hint">Las recomendaciones del inicio siguen el idioma de la sinopsis. Si nada coincide, se muestran títulos al azar.</string>
     <string name="settings_refresh">Actualizar</string>
     <string name="settings_refresh_all">Actualizar todo</string>
     <string name="settings_refresh_guide">Guía</string>
@@ -151,8 +144,6 @@
     <string name="settings_sign_out">Cerrar sesión</string>
     <string name="settings_smooth">Modo 4K fluido</string>
     <string name="settings_smooth_hint">Si el sonido se desfasa, desactiva el modo 4K fluido.</string>
-    <string name="settings_startup">Inicio</string>
-    <string name="settings_startup_open">Abrir al iniciar la TV</string>
     <string name="settings_support">Acerca de</string>
     <string name="settings_support_text">Escanea el código con tu móvil: novedades, actualizaciones y una forma de apoyar el proyecto.</string>
     <string name="settings_version">versión %1$s</string>
@@ -163,8 +154,4 @@
     <string name="similar_none">No se encontró ningún título similar.</string>
     <string name="similar_series">Series similares</string>
     <string name="splash_loading">Cargando…</string>
-    <string name="startup_hint">Funciona al encender la TV (no desde el reposo) y solo si la TV lo permite.</string>
-    <string name="startup_need">Permiso necesario: permite «Mostrar sobre otras apps» para LAMAYNE IPTV en la pantalla que se abrió.</string>
-    <string name="startup_ready">Listo: la aplicación se abre al iniciar la TV.</string>
-    <string name="startup_unavailable">No disponible en esta TV: el sistema no ofrece este permiso.</string>
 </resources>

@@ -108,3 +108,32 @@ fun progressFromJson(o: JSONObject): WatchProgress? {
         number = o.optInt("number", 0),
     )
 }
+
+// The home banner, kept so that the home page shows at once at the next start.
+fun featuredToJson(f: Featured): JSONObject {
+    val o = JSONObject()
+        .put("kind", f.kind.name)
+        .put("title", f.title)
+        .put("backdrop", f.backdrop ?: "")
+        .put("meta", f.meta)
+        .put("plot", f.plot ?: "")
+
+    f.movie?.let { o.put("movie", movieToJson(it)) }
+    f.series?.let { o.put("series", seriesToJson(it)) }
+
+    return o
+}
+
+fun featuredFromJson(o: JSONObject): Featured? {
+    val kind = try {
+        MediaKind.valueOf(o.getString("kind"))
+    } catch (e: Exception) {
+        return null
+    }
+    val movie = o.optJSONObject("movie")?.let { movieFromJson(it) }
+    val series = o.optJSONObject("series")?.let { seriesFromJson(it) }
+
+    if (movie == null && series == null) return null
+
+    return Featured(kind, movie, series, o.optString("title"), o.text("backdrop"), o.optString("meta"), o.text("plot"))
+}

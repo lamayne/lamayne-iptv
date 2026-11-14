@@ -1,6 +1,8 @@
 package com.lamayne.iptv.tv
 
 import android.app.Application
+import android.os.Build
+import android.content.res.Resources
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -37,6 +39,8 @@ import com.lamayne.iptv.tv.data.WatchProgress
 import com.lamayne.iptv.tv.data.XtreamClient
 import com.lamayne.iptv.tv.data.channelFromJson
 import com.lamayne.iptv.tv.data.channelToJson
+import com.lamayne.iptv.tv.data.featuredFromJson
+import com.lamayne.iptv.tv.data.featuredToJson
 import com.lamayne.iptv.tv.data.movieFromJson
 import com.lamayne.iptv.tv.data.movieToJson
 import com.lamayne.iptv.tv.data.progressFromJson
@@ -239,6 +243,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val recentChannelStore = JsonListStore(application, "recent_", 30, ::channelToJson, ::channelFromJson)
     private val recentMovieStore = JsonListStore(application, "recentm_", 30, ::movieToJson, ::movieFromJson)
     private val recentSeriesStore = JsonListStore(application, "recents_", 30, ::seriesToJson, ::seriesFromJson)
+    private val homeMovieStore = JsonListStore(application, "homem_", 24, ::movieToJson, ::movieFromJson)
+    private val homeSeriesStore = JsonListStore(application, "homes_", 24, ::seriesToJson, ::seriesFromJson)
+    private val homeFeaturedStore = JsonListStore(application, "homef_", 6, ::featuredToJson, ::featuredFromJson)
     private val progressStore = JsonListStore(application, "progress_", 150, ::progressToJson, ::progressFromJson)
 
     // ------------------------------------------------------------------ account
@@ -293,26 +300,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         { c, id -> XtreamClient.series(c, id) },
         { _hiddenSeries.value },
     )
-
-    // The language of the home recommendations ("auto" = the language of the app).
-    private val _homeLanguage = MutableStateFlow(settings.homeLanguage)
-    val homeLanguage: StateFlow<String> = _homeLanguage.asStateFlow()
-
-    // The languages really present in the categories (the ones hidden by the user do not count).
-    val availableHomeLanguages: StateFlow<List<String>> =
-        combine(movies.categories, series.categories, _hiddenMovies, _hiddenSeries) { movieList, seriesList, hiddenMovies, hiddenSeries ->
-            val found = HashSet<String>()
-
-            for (category in movieList) {
-                if (category.id !in hiddenMovies) categoryTag(category.name)?.let { tag -> languageOfTag(tag)?.let { found.add(it) } }
-            }
-
-            for (category in seriesList) {
-                if (category.id !in hiddenSeries) categoryTag(category.name)?.let { tag -> languageOfTag(tag)?.let { found.add(it) } }
-            }
-
-            LANGUAGES.keys.filter { it in found }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ------------------------------------------------------------------ favourites, history
 
@@ -655,6 +642,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _favSeries.value = favSeriesStore.load(credentials)
         _progress.value = progressStore.load(credentials)
         _recentChannels.value = recentChannelStore.load(credentials)
+        // The home page of last time is shown at once; it is renewed in the background.
+        _latestMovies.value = homeMovieStore.load(credentials)
+        _latestSeries.value = homeSeriesStore.load(credentials)
+        _featured.value = homeFeaturedStore.load(credentials)
         _recentMovies.value = recentMovieStore.load(credentials)
         _recentSeries.value = recentSeriesStore.load(credentials)
         _hiddenLive.value = settings.hidden(credentials, MediaKind.LIVE)
@@ -667,23 +658,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ------------------------------------------------------------------ language
 
     // The movies and series that are suggested follow the language of the app.
+    // The language of the home page. "Auto" = the language of the Google TV; the app speaks French,
+    // Spanish and English, so any other language of the TV means English. (The language of the TV
+    // is read from the system itself: the one the app may have forced earlier does not count.)
     private fun contentLanguage(): String {
         val chosen = settings.language
+        val code = if (chosen != "system") chosen else systemLanguage()
 
-        return if (chosen != "system") chosen else Locale.getDefault().language
+        return if (code == "fr" || code == "es") code else "en"
     }
 
-    private fun homeLanguageCode(): String =
-        settings.homeLanguage.takeIf { it != "auto" } ?: contentLanguage()
+    private fun systemLanguage(): String {
+        val configuration = Resources.getSystem().configuration
 
-    fun setHomeLanguage(code: String) {
-        settings.homeLanguage = code
-        _homeLanguage.value = code
-
-        val credentials = _credentials.value ?: return
-
-        _featured.value = emptyList()
-        loadHome(credentials)
+        return if (Build.VERSION.SDK_INT >= 24) {
+            configuration.locales.get(0).language
+        } else {
+            @Suppress("DEPRECATION")
+            configuration.locale.language
+        }
     }
 
     // Changing the language reloads what depends on it.
@@ -695,6 +688,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         movies.reset()
         series.reset()
         _featured.value = emptyList()
+        _latestMovies.value = emptyList()
+        _latestSeries.value = emptyList()
+        homeFeaturedStore.save(credentials, emptyList())
+        homeMovieStore.save(credentials, emptyList())
+        homeSeriesStore.save(credentials, emptyList())
         loadHome(credentials)
     }
 
@@ -1571,195 +1569,66 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         homeJob?.cancel()
         homeJob = viewModelScope.launch {
-            _homeLoading.value = true
+            // What was shown last time stays on screen (no waiting, no grey shapes): it is
+            // replaced as soon as the new content is ready.
+            _homeLoading.value = _featured.value.isEmpty() && _latestMovies.value.isEmpty()
             _homeError.value = null
 
             try {
-                val target = homeLanguageCode()
-                // "Auto" falls back to what exists; a language chosen by hand never does.
-                val strict = settings.homeLanguage != "auto"
+                val target = contentLanguage()
+                val tags = tagsFor(target)
 
-                val movieCategories = XtreamClient.movieCategories(credentials)
-                val seriesCategories = XtreamClient.seriesCategories(credentials)
+                // The categories and the two lists are asked at the same time.
+                val (movieList, seriesList) = coroutineScope {
+                    val movieJob = async {
+                        val category = pickLatest(XtreamClient.movieCategories(credentials), _hiddenMovies.value, tags)
 
-                homeMovieCategories = movieCategories
-                homeSeriesCategories = seriesCategories
-                val movieCategory = chooseMovieCategory(credentials, movieCategories, _hiddenMovies.value, target, strict)
-                val seriesCategory = chooseSeriesCategory(credentials, seriesCategories, _hiddenSeries.value, target, strict)
+                        category?.let { recentMovies(XtreamClient.movies(credentials, it.id)) }.orEmpty()
+                    }
+                    val seriesJob = async {
+                        val category = pickLatest(XtreamClient.seriesCategories(credentials), _hiddenSeries.value, tags)
 
-                val latestMovies = movieCategory
-                    ?.let { recentMovies(XtreamClient.movies(credentials, it.id)) }
-                    .orEmpty()
-                    .let { list -> keepLoadedPosters(list, { it.poster }, 20) }
+                        category?.let { recentSeries(XtreamClient.series(credentials, it.id)) }.orEmpty()
+                    }
 
-                _latestMovies.value = latestMovies
+                    movieJob.await() to seriesJob.await()
+                }
 
-                val latestSeries = seriesCategory
-                    ?.let { recentSeries(XtreamClient.series(credentials, it.id)) }
-                    .orEmpty()
-                    .let { list -> keepLoadedPosters(list, { it.poster }, 20) }
+                if (movieList.isNotEmpty()) {
+                    _latestMovies.value = movieList
+                    homeMovieStore.save(credentials, movieList)
+                }
 
-                _latestSeries.value = latestSeries
+                if (seriesList.isNotEmpty()) {
+                    _latestSeries.value = seriesList
+                    homeSeriesStore.save(credentials, seriesList)
+                }
 
-                buildFeatured(credentials, latestMovies, latestSeries, target, strict)
+                buildFeatured(credentials, movieList, seriesList, target)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _homeError.value = toUiError(e)
+                // an error only matters when there is nothing to show
+                if (_featured.value.isEmpty() && _latestMovies.value.isEmpty()) _homeError.value = toUiError(e)
             } finally {
                 _homeLoading.value = false
             }
         }
     }
 
-    // ---- which category is "the latest ones" in the chosen language
-
-    private val categoryLanguageCache = HashMap<String, String>()
-    private var homeMovieCategories: List<Category> = emptyList()
-    private var homeSeriesCategories: List<Category> = emptyList()
-
-    private fun latestScore(name: String): Int {
-        val text = normalizeText(name)
-
-        return if (LATEST_WORDS.any { text.contains(it) }) 1 else 0
-    }
-
-    // 1. a category tagged with the language ("|EN| NEW RELEASES") is taken;
-    // 2. otherwise the synopses of a few titles of each category tell its language;
-    // 3. none found: "auto" takes the first category, a language chosen by hand shows nothing.
-    private suspend fun chooseMovieCategory(
-        credentials: Credentials,
-        categories: List<Category>,
-        hidden: Set<String>,
-        target: String,
-        strict: Boolean,
-    ): Category? {
-        val visible = categories.filter { it.id !in hidden }
-        val tags = tagsFor(target)
-
-        visible.filter { categoryTag(it.name) in tags }.maxByOrNull { latestScore(it.name) }?.let { return it }
-
-        val untagged = visible
-            .filter { categoryTag(it.name)?.let { tag -> languageOfTag(tag) } == null }
-            .sortedByDescending { latestScore(it.name) }
-            .take(8)
-        val sampled = coroutineScope {
-            untagged.map { category -> async { category to sampleMovieLanguage(credentials, category.id) } }.awaitAll()
-        }
-
-        sampled.firstOrNull { it.second == target }?.let { return it.first }
-
-        return if (strict) null else untagged.firstOrNull() ?: visible.firstOrNull()
-    }
-
-    private suspend fun chooseSeriesCategory(
-        credentials: Credentials,
-        categories: List<Category>,
-        hidden: Set<String>,
-        target: String,
-        strict: Boolean,
-    ): Category? {
-        val visible = categories.filter { it.id !in hidden }
-        val tags = tagsFor(target)
-
-        visible.filter { categoryTag(it.name) in tags }.maxByOrNull { latestScore(it.name) }?.let { return it }
-
-        val untagged = visible
-            .filter { categoryTag(it.name)?.let { tag -> languageOfTag(tag) } == null }
-            .sortedByDescending { latestScore(it.name) }
-            .take(8)
-        val sampled = coroutineScope {
-            untagged.map { category -> async { category to sampleSeriesLanguage(credentials, category.id) } }.awaitAll()
-        }
-
-        sampled.firstOrNull { it.second == target }?.let { return it.first }
-
-        return if (strict) null else untagged.firstOrNull() ?: visible.firstOrNull()
-    }
-
-    private suspend fun sampleMovieLanguage(credentials: Credentials, categoryId: String): String? {
-        categoryLanguageCache["M$categoryId"]?.let { return it.ifEmpty { null } }
-
-        return try {
-            val picks = XtreamClient.movies(credentials, categoryId)
-                .filter { !it.poster.isNullOrBlank() }
-                .sortedByDescending { it.added }
-                .take(4)
-            val plots = coroutineScope {
-                picks.map { movie -> async { movieInfoOf(credentials, movie.id)?.plot } }.awaitAll()
-            }
-            val language = PlotLanguage.majority(plots)
-
-            categoryLanguageCache["M$categoryId"] = language.orEmpty()
-            language
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private suspend fun sampleSeriesLanguage(credentials: Credentials, categoryId: String): String? {
-        categoryLanguageCache["S$categoryId"]?.let { return it.ifEmpty { null } }
-
-        return try {
-            val picks = XtreamClient.series(credentials, categoryId)
-                .filter { !it.poster.isNullOrBlank() }
-                .sortedByDescending { it.added }
-                .take(4)
-            val plots = coroutineScope {
-                picks.map { show ->
-                    async {
-                        try {
-                            infoSemaphore.withPermit { cachedSeriesInfo(credentials, show.id).info.plot }
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            null
-                        }
-                    }
-                }.awaitAll()
-            }
-            val language = PlotLanguage.majority(plots)
-
-            categoryLanguageCache["S$categoryId"] = language.orEmpty()
-            language
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    // Only the titles whose picture really loads are shown: no empty tile on the home page.
-    private suspend fun <T> keepLoadedPosters(items: List<T>, poster: (T) -> String?, limit: Int): List<T> {
-        val kept = ArrayList<T>()
-
-        for (group in items.chunked(6)) {
-            val loaded = coroutineScope { group.map { item -> async { imageLoads(poster(item)) } }.awaitAll() }
-
-            group.forEachIndexed { position, item -> if (loaded[position]) kept.add(item) }
-
-            if (kept.size >= limit) break
-        }
-
-        return kept.take(limit)
-    }
-
-    // Up to 5 highlights, movie and series in turn. A highlight must have a SYNOPSIS in the chosen
-    // language and a PICTURE that really loads; the others are skipped and the next titles are
-    // tried (4 at a time). Each one appears as soon as it is ready. If no title matches the
-    // language, "auto" shows the others rather than an empty page.
+    // Up to 5 highlights, movie and series in turn, taken among the 12 first titles of the latest
+    // categories (4 at a time). A highlight must have a synopsis and a picture that loads. The
+    // ones whose synopsis is in the language of the app come first; if there are none, the others
+    // are shown rather than nothing. The result is kept for the next start.
     private suspend fun buildFeatured(
         credentials: Credentials,
         latestMovies: List<Movie>,
         latestSeries: List<Series>,
         target: String,
-        strict: Boolean,
     ) {
         val candidates = ArrayList<Any>()
 
-        for (position in 0 until 10) {
+        for (position in 0 until 6) {
             latestMovies.getOrNull(position)?.let { candidates.add(it) }
             latestSeries.getOrNull(position)?.let { candidates.add(it) }
         }
@@ -1775,67 +1644,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             for (pair in built) {
                 val (slide, language) = pair ?: continue
 
-                if (language == target) {
-                    if (matching.size < 5) matching.add(slide)
-                } else {
-                    others.add(slide)
-                }
+                if (language == target) matching.add(slide) else others.add(slide)
             }
 
-            _featured.value = matching.toList()
+            // Nothing on screen yet (first start): the first slides appear at once.
+            if (_featured.value.isEmpty()) {
+                _featured.value = (if (matching.isNotEmpty()) matching else others).take(5)
+            }
 
             if (matching.size >= 5) break
         }
 
-        if (matching.isEmpty()) {
-            // Nothing in the chosen language: random movies and series (with a synopsis and a picture)
-            // rather than an empty banner.
-            _featured.value = randomSlides(credentials, target)
+        val result = (if (matching.isNotEmpty()) matching else others).take(5)
+
+        if (result.isNotEmpty()) {
+            _featured.value = result
+            homeFeaturedStore.save(credentials, result)
         }
-    }
-
-    // Titles taken at random in random categories; the ones in the chosen language come first.
-    private suspend fun randomSlides(credentials: Credentials, target: String): List<Featured> {
-        val candidates = ArrayList<Any>()
-
-        try {
-            for (category in homeMovieCategories.filter { it.id !in _hiddenMovies.value }.shuffled().take(2)) {
-                candidates.addAll(
-                    XtreamClient.movies(credentials, category.id).filter { !it.poster.isNullOrBlank() }.shuffled().take(8)
-                )
-            }
-
-            for (category in homeSeriesCategories.filter { it.id !in _hiddenSeries.value }.shuffled().take(2)) {
-                candidates.addAll(
-                    XtreamClient.series(credentials, category.id).filter { !it.poster.isNullOrBlank() }.shuffled().take(8)
-                )
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // what was found is used
-        }
-
-        val matching = ArrayList<Featured>()
-        val others = ArrayList<Featured>()
-
-        for (group in candidates.shuffled().chunked(4)) {
-            val built = coroutineScope {
-                group.map { candidate -> async { buildSlide(credentials, candidate) } }.awaitAll()
-            }
-
-            for (pair in built) {
-                val (slide, language) = pair ?: continue
-
-                if (language == target) matching.add(slide) else others.add(slide)
-            }
-
-            _featured.value = (matching + others).take(5)
-
-            if (matching.size + others.size >= 5) break
-        }
-
-        return (matching + others).take(5)
     }
 
     // The slide and the language of its synopsis.

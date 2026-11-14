@@ -133,20 +133,6 @@ class SettingsStore(context: Context) {
             prefs.edit().putBoolean("fav_newest_first", value).apply()
         }
 
-    // Open the app when the TV starts (needs the "display over other apps" permission).
-    var launchAtBoot: Boolean
-        get() = prefs.getBoolean("launch_at_boot", false)
-        set(value) {
-            prefs.edit().putBoolean("launch_at_boot", value).apply()
-        }
-
-    // The language of what the home page recommends: "auto" = the language of the app.
-    var homeLanguage: String
-        get() = prefs.getString("home_lang", "auto") ?: "auto"
-        set(value) {
-            prefs.edit().putString("home_lang", value).apply()
-        }
-
     // 0 = fit, 1 = zoom (fills the screen, crops the edges), 2 = stretch
     var aspect: Int
         get() = prefs.getInt("aspect", 0)
