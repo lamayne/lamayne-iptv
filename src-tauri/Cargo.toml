@@ -1,6 +1,6 @@
 [package]
 name = "lamayne-iptv"
-version = "0.1.1"
+version = "0.2.0"
 description = "LAMAYNE IPTV — a personal player for your IPTV sources (Xtream, M3U)"
 license = "MIT"
 authors = ["LAMAYNE IPTV contributors"]
