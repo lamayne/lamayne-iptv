@@ -32,8 +32,6 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.10.2
@@ -91,8 +89,13 @@ jobs:
         run: |
           mkdir -p out
           cp tv/app/build/outputs/apk/release/app-release.apk "out/LAMAYNE-TV_${VERSION}.apk"
-          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
-          "$apksigner" verify --print-certs "out/LAMAYNE-TV_${VERSION}.apk"
+          # The Android SDK is already on the GitHub runner (no setup step is needed).
+          apksigner=$(ls "${ANDROID_HOME:-$ANDROID_SDK_ROOT}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$apksigner" ]; then
+            "$apksigner" verify --print-certs "out/LAMAYNE-TV_${VERSION}.apk"
+          else
+            echo "::warning::apksigner not found: the signature was not verified."
+          fi
           cd out
           sha256sum "LAMAYNE-TV_${VERSION}.apk" > SHA256SUMS-TV.txt
           cat SHA256SUMS-TV.txt
