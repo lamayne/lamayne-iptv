@@ -13,13 +13,32 @@ android {
         // Android 6.0: the oldest version with the encrypted key storage (Keystore AES-GCM).
         minSdk = 23
         targetSdk = 35
-        versionCode = 21
-        versionName = "0.13.3"
+        versionCode = 22
+        versionName = "0.14.0"
+    }
+
+    // Release signing: the key comes from the environment (GitHub secrets), never from the repository.
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+
+            // Signed with the release key when it is given (otherwise the apk stays unsigned).
+            if (System.getenv("ANDROID_KEYSTORE_PATH") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

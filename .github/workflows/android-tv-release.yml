@@ -1,0 +1,136 @@
+name: Android TV release
+
+# Builds the SIGNED release apk of the Android TV / Google TV app and publishes it as a GitHub
+# release named "tv-vX.Y.Z" (X.Y.Z = versionName in tv/app/build.gradle.kts).
+#
+# Run it by hand: Actions -> Android TV release -> Run workflow.
+# It needs four secrets (see tv/INSTALL.md): ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+# ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.
+#
+# The release is created by this workflow itself: GitHub does not start the Windows release
+# workflow for it, and it does not take the "Latest" mark from the Windows app.
+
+on:
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: "What is new (shown in the release)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+
+      - name: Read the version
+        id: version
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' tv/app/build.gradle.kts)
+          if [ -z "$version" ]; then
+            echo "::error::versionName not found in tv/app/build.gradle.kts"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check that this version is not released yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "tv-v${{ steps.version.outputs.version }}" > /dev/null 2>&1; then
+            echo "::error::The release tv-v${{ steps.version.outputs.version }} already exists. Raise versionName and versionCode in tv/app/build.gradle.kts."
+            exit 1
+          fi
+
+      - name: Check the signing secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing secret ANDROID_${name}. See tv/INSTALL.md."
+              exit 1
+            fi
+          done
+
+      - name: Prepare the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Build the release apk
+        working-directory: tv
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: Name the apk, check its signature, compute its SHA-256
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p out
+          cp tv/app/build/outputs/apk/release/app-release.apk "out/LAMAYNE-TV_${VERSION}.apk"
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          "$apksigner" verify --print-certs "out/LAMAYNE-TV_${VERSION}.apk"
+          cd out
+          sha256sum "LAMAYNE-TV_${VERSION}.apk" > SHA256SUMS-TV.txt
+          cat SHA256SUMS-TV.txt
+          ls -la
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lamayne-tv-release
+          path: out/
+          if-no-files-found: error
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          hash=$(cut -d' ' -f1 out/SHA256SUMS-TV.txt)
+          cat > notes.md <<EOF
+          ## LAMAYNE TV ${VERSION}
+
+          ${NOTES}
+
+          ### Install (Android TV / Google TV)
+          1. Install **Downloader** (by AFTVnews) from the TV's app store.
+          2. Allow Downloader to install unknown apps (Settings > Apps > Security & restrictions).
+          3. In Downloader, enter this address:
+             https://github.com/${GITHUB_REPOSITORY}/releases/download/tv-v${VERSION}/LAMAYNE-TV_${VERSION}.apk
+          4. Install. To update, do the same: the new version installs over the old one.
+
+          SHA-256: ${hash}
+
+          LAMAYNE IPTV provides no content: you need your own IPTV subscription.
+          EOF
+
+          gh release create "tv-v${VERSION}" \
+            "out/LAMAYNE-TV_${VERSION}.apk" out/SHA256SUMS-TV.txt \
+            --target "$GITHUB_SHA" \
+            --title "LAMAYNE TV ${VERSION}" \
+            --notes-file notes.md \
+            --latest=false
