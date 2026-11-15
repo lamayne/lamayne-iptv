@@ -376,3 +376,45 @@ fun SettingsTab(viewModel: MainViewModel) {
         }
     }
 }
+
+// The QR code leads to the Linktree (news, updates and the way to support the project).
+private const val NEWS_URL = "https://linktr.ee/lamayne"
+
+// "Subscription: 23 day(s) left (until 12 Dec 2026)": orange under a week, red when over.
+@Composable
+private fun SubscriptionLines(info: AccountInfo) {
+    val expires = info.expires
+    val now = System.currentTimeMillis() / 1000
+    val dateText = expires?.let { DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it * 1000)) }.orEmpty()
+    val days = expires?.let { Math.ceil((it - now) / 86_400.0).toInt() }
+
+    val text: String
+    val color: Color
+
+    if (expires == null || days == null) {
+        text = stringResource(R.string.account_unlimited)
+        color = Muted
+    } else if (days < 0) {
+        text = stringResource(R.string.account_expired, dateText)
+        color = Danger
+    } else {
+        text = stringResource(R.string.account_days_left, days, dateText)
+        color = if (days <= 7) Color(0xFFFBBF24) else AccentBright
+    }
+
+    Text(text, color = color, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+
+    val max = info.maxConnections
+
+    if (max != null && max > 0) {
+        Text(
+            stringResource(R.string.account_connections, info.activeConnections ?: 0, max),
+            color = Muted,
+            fontSize = 14.sp,
+        )
+    }
+
+    if (info.trial) {
+        Text(stringResource(R.string.account_trial), color = Muted, fontSize = 14.sp)
+    }
+}
