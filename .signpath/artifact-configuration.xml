@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Artifact configuration to paste into SignPath (Project > Artifact Configurations).
-  The installers folder is sent as a ZIP, so the root element is <zip-file>.
-  Each installer .exe is signed (Authenticode).
+  The installers folder is sent as a ZIP file: its root is <zip-file>.
+  Every installer (.exe) is signed (Authenticode).
+
+  SignPath Foundation requires the file metadata to be enforced: the product name must be the
+  name of the project, and the product version must be the same in every file of a build.
+  The "version" parameter is given by the signing request (see .github/workflows/release.yml).
 -->
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
   <zip-file>
-    <pe-file path="LAMAYNE-IPTV_*_x64-setup*.exe">
+    <pe-file path="LAMAYNE-IPTV_*_x64-setup*.exe" max-matches="unbounded"
+             product-name="LAMAYNE IPTV" product-version="${version}">
       <authenticode-sign/>
     </pe-file>
   </zip-file>
