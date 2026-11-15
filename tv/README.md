@@ -1,20 +1,29 @@
-# LAMAYNE IPTV for Google TV / Android TV (test build)
+# LAMAYNE IPTV for Android TV / Google TV
 
-A native Android TV app (Kotlin, Jetpack Compose, Media3/ExoPlayer). It works
-on Android 6.0 and later. Test build 0.13: sign in with an Xtream account,
-browse live categories and channels, favourites, recent channels, search, the programme guide (now / next), and play with on-screen controls (pause, previous / next channel, favourite; up / down to zap).
+A native Android TV app (Kotlin, Jetpack Compose, Media3 / ExoPlayer). It works on Android 6.0 and later.
+It provides **no content**: only use sources you are authorised to use.
 
-- Built by GitHub Actions: **Actions -> Android TV build (test) -> Run workflow**.
-- The result is attached to the pre-release `tv-test` as `LAMAYNE-TV-test.apk`.
-- The app provides no content. Use only sources you are authorised to use.
+## What it does
 
-## Install on a TV (sideloading)
+- **Sign in** with an Xtream Codes account or an M3U link (an M3U link gives Live TV only).
+- **Home page** made for the remote: a banner with a movie or series, then rows for what you were watching, your channels,
+  your favourites and the latest movies and series. It is kept on the device and shows at once at the next start.
+- **Live TV**: categories, favourites, recently watched, search, and the programme guide (now / next).
+- **Movies and series**: details, resume playback, cast with an actor page (their titles in your catalogue), similar titles.
+- **Player**: audio and subtitle tracks, seek bar, a "4K smooth" option, and zapping with up / down on live channels.
+- **Favourites** in the order you choose (a long press on OK adds or removes one).
+- **Interface** in English, French and Spanish (Auto follows the language of the TV; any other language means English).
+- **Private**: no telemetry. The account and your lists are encrypted on the device (AES-256-GCM, key in the Android Keystore).
 
-1. On the TV, install the **Downloader** app from the Play Store, and allow it to
-   install unknown apps (Settings -> Apps -> Security & restrictions).
-2. In Downloader, open this address:
-   `https://github.com/lamayne/lamayne-iptv/releases/download/tv-test/LAMAYNE-TV-test.apk`
-3. Install, then open **LAMAYNE IPTV** from the apps row.
+## Install
+
+See [INSTALL.md](INSTALL.md). In short: install **Downloader** on the TV, then open the address of the apk given in the
+latest **LAMAYNE TV** release.
+
+## Test builds
+
+Debug builds, for testing only, are attached to the pre-release `tv-test`
+(**Actions → Android TV build (test) → Run workflow**).
 
 ## For developers
 
@@ -23,8 +32,4 @@ cd tv
 gradle assembleDebug
 ```
 
-Setting the account from a computer (ADB):
-
-```
-adb shell am start -n com.lamayne.iptv.tv/.MainActivity --es server http://host:port --es user USER --es pass PASS
-```
+Releases are built and signed by **Actions → Android TV release** (see [INSTALL.md](INSTALL.md)).
