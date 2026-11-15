@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">LAMAYNE IPTV</string>
+    <string name="account_connections">Connections in use: %1$d of %2$d</string>
+    <string name="account_days_left">Subscription: %1$d day(s) left (until %2$s)</string>
+    <string name="account_expired">Subscription expired on %1$s</string>
+    <string name="account_trial">Trial account</string>
+    <string name="account_unlimited">Subscription: no expiry date</string>
     <string name="actor_elapsed">%1$d s</string>
     <string name="actor_loading_hint">It is working. Press Back to cancel.</string>
     <string name="actor_none">No movie found</string>
